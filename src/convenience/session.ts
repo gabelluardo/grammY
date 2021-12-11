@@ -1,9 +1,9 @@
-import { Context } from '../context.ts'
-import { MiddlewareFn } from '../composer.ts'
-import { debug as d } from '../platform.ts'
-const debug = d('grammy:session')
+import { Context } from "../context.ts";
+import { MiddlewareFn } from "../composer.ts";
+import { debug as d } from "../platform.deno.ts";
+const debug = d("grammy:session");
 
-type MaybePromise<T> = Promise<T> | T
+type MaybePromise<T> = Promise<T> | T;
 
 /**
  * A session flavor is a context flavor that holds session data under
@@ -12,7 +12,7 @@ type MaybePromise<T> = Promise<T> | T
  * Session middleware will load the session data of a specific chat from your
  * storage solution, and make it available to you on the context object. Check
  * out the
- * [documentation](https://doc.deno.land/https/deno.land/x/grammy/mod.ts#session)
+ * [documentation](https://doc.deno.land/https://deno.land/x/grammy/mod.ts/~/session)
  * on session middleware to know more, and read the section about sessions on
  * the [website](https://grammy.dev/plugins/session.html).
  */
@@ -21,7 +21,7 @@ export interface SessionFlavor<S> {
      * Session data on the context object.
      *
      * **WARNING:** You have to make sure that your session data is not
-     * undefined by _providing an inital value to the session middleware_, or by
+     * undefined by _providing an initial value to the session middleware_, or by
      * making sure that `ctx.session` is assigned if it is empty! The type
      * system does not include `| undefined` because this is really annoying to
      * work with.
@@ -30,8 +30,8 @@ export interface SessionFlavor<S> {
      * `getSessionKey(ctx) === undefined` for the respective context object
      * `ctx`.
      */
-    get session(): S
-    set session(session: S | null | undefined)
+    get session(): S;
+    set session(session: S | null | undefined);
 }
 /**
  * A lazy session flavor is a context flavor that holds a promise of some
@@ -41,7 +41,7 @@ export interface SessionFlavor<S> {
  * object. Once you access `ctx.session`, the storage will be queried and the
  * session data becomes available. If you access `ctx.session` again for the
  * same context object, the cached value will be used. Check out the
- * [documentation](https://doc.deno.land/https/deno.land/x/grammy/mod.ts#lazySession)
+ * [documentation](https://doc.deno.land/https://deno.land/x/grammy/mod.ts/~/lazySession)
  * on lazy session middleware to know more, and read the section about lazy
  * sessions on the
  * [website](https://grammy.dev/plugins/session.html#lazy-sessions).
@@ -60,8 +60,8 @@ export interface LazySessionFlavor<S> {
      * `getSessionKey(ctx) === undefined` holds for the respective context
      * object `ctx`.
      */
-    get session(): MaybePromise<S>
-    set session(session: MaybePromise<S | null | undefined>)
+    get session(): MaybePromise<S>;
+    set session(session: MaybePromise<S | null | undefined>);
 }
 
 /**
@@ -75,15 +75,15 @@ export interface StorageAdapter<T> {
      * Reads a value for the given key from the storage. May return the value or
      * undefined, or a promise of either.
      */
-    read: (key: string) => MaybePromise<T | undefined>
+    read: (key: string) => MaybePromise<T | undefined>;
     /**
      * Writes a value for the given key to the storage.
      */
-    write: (key: string, value: T) => MaybePromise<void>
+    write: (key: string, value: T) => MaybePromise<void>;
     /**
      * Deletes a value for the given key from the storage.
      */
-    delete: (key: string) => MaybePromise<void>
+    delete: (key: string) => MaybePromise<void>;
 }
 
 /**
@@ -99,7 +99,7 @@ export interface SessionOptions<S> {
      * that different context objects do that accidentally share the same
      * session data.
      */
-    initial?: () => S
+    initial?: () => S;
     /**
      * This option lets you generate your own session keys per context object.
      * The session key determines how to map the different session objects to
@@ -111,7 +111,7 @@ export interface SessionOptions<S> {
      * The default implementation will store sessions per chat, as determined by
      * `ctx.chat?.id`.
      */
-    getSessionKey?: (ctx: Context) => MaybePromise<string | undefined>
+    getSessionKey?: (ctx: Context) => MaybePromise<string | undefined>;
     /**
      * A storage adapter to your storage solution. Provides read, write, and
      * delete access to the session middleware.
@@ -123,7 +123,7 @@ export interface SessionOptions<S> {
      * The default implementation will store session in memory. The data will be
      * lost whenever your bot restarts.
      */
-    storage?: StorageAdapter<S>
+    storage?: StorageAdapter<S>;
 }
 /**
  * Session middleware provides a persistent data storage for your bot. You can
@@ -173,42 +173,43 @@ export interface SessionOptions<S> {
  * @param options Optional configuration to pass to the session middleware
  */
 export function session<S, C extends Context>(
-    options?: SessionOptions<S>
+    options: SessionOptions<S> = {},
 ): MiddlewareFn<C & SessionFlavor<S>> {
-    const getSessionKey = options?.getSessionKey ?? defaultGetSessionKey
-    const storage =
-        options?.storage ??
+    const getSessionKey = options.getSessionKey ?? defaultGetSessionKey;
+    const storage = options.storage ??
         (debug(
-            'Storing session data in memory, all data will be lost when the bot restarts.'
+            "Storing session data in memory, all data will be lost when the bot restarts.",
         ),
-        new MemorySessionStorage())
+            new MemorySessionStorage());
     return async (ctx, next) => {
-        const key = await getSessionKey(ctx)
-        let value =
-            key === undefined
-                ? undefined
-                : (await storage.read(key)) ?? options?.initial?.()
-        Object.defineProperty(ctx, 'session', {
+        const key = await getSessionKey(ctx);
+        let value = key === undefined
+            ? undefined
+            : (await storage.read(key)) ?? options.initial?.();
+        Object.defineProperty(ctx, "session", {
             get() {
-                if (key === undefined)
+                if (key === undefined) {
                     throw new Error(
-                        'Cannot access session data because the session key was undefined!'
-                    )
-                return value
+                        "Cannot access session data because the session key was undefined!",
+                    );
+                }
+                return value;
             },
             set(v) {
-                if (key === undefined)
+                if (key === undefined) {
                     throw new Error(
-                        'Cannot assign session data because the session key was undefined!'
-                    )
-                value = v
+                        "Cannot assign session data because the session key was undefined!",
+                    );
+                }
+                value = v;
             },
-        })
-        await next() // no catch: do not write back if middleware throws
-        if (key !== undefined)
-            if (value == null) await storage.delete(key)
-            else await storage.write(key, value)
-    }
+        });
+        await next(); // no catch: do not write back if middleware throws
+        if (key !== undefined) {
+            if (value == null) await storage.delete(key);
+            else await storage.write(key, value);
+        }
+    };
 }
 
 /**
@@ -244,70 +245,77 @@ export function session<S, C extends Context>(
  * @param options Optional configuration to pass to the session middleware
  */
 export function lazySession<S, C extends Context>(
-    options?: SessionOptions<S>
+    options: SessionOptions<S> = {},
 ): MiddlewareFn<C & LazySessionFlavor<S>> {
-    const getSessionKey = options?.getSessionKey ?? defaultGetSessionKey
-    const storage =
-        options?.storage ??
+    const getSessionKey = options.getSessionKey ?? defaultGetSessionKey;
+    const storage = options.storage ??
         (debug(
-            'Storing session data in memory, all data will be lost when the bot restarts.'
+            "Storing session data in memory, all data will be lost when the bot restarts.",
         ),
-        new MemorySessionStorage())
+            new MemorySessionStorage());
     return async (ctx, next) => {
-        const key = await getSessionKey(ctx)
-        let value: Promise<S | undefined> | S | undefined = undefined
-        let promise: Promise<S | undefined> | undefined = undefined
-        let wrote = false
-        let read = false
-        let fetching = false
-        Object.defineProperty(ctx, 'session', {
+        const key = await getSessionKey(ctx);
+        let value: MaybePromise<S | undefined> = undefined;
+        let promise: Promise<S | undefined> | undefined = undefined;
+        let fetching = false;
+        let read = false;
+        let wrote = false;
+
+        async function load() {
+            if (key === undefined) {
+                throw new Error(
+                    "Cannot access lazy session data because the session key was undefined!",
+                );
+            }
+            let v = await storage.read(key);
+            if (!fetching) return value;
+            if (v === undefined) {
+                v = options.initial?.();
+                if (v !== undefined) {
+                    wrote = true;
+                    value = v;
+                }
+            } else {
+                value = v;
+            }
+            return value;
+        }
+
+        Object.defineProperty(ctx, "session", {
             get() {
-                if (wrote) return value
-                if (key === undefined)
-                    throw new Error(
-                        'Cannot access lazy session data because the session key was undefined!'
-                    )
-                read = true
-                return (promise ??=
-                    ((fetching = true),
-                    Promise.resolve(storage.read(key)).then(v => {
-                        if (!fetching) return value
-                        if (v === undefined) {
-                            v = options?.initial?.()
-                            if (v !== undefined) {
-                                wrote = true
-                                value = v
-                            }
-                        } else {
-                            value = v
-                        }
-                        return value
-                    })))
+                if (wrote) return value;
+                read = true;
+                if (promise === undefined) {
+                    fetching = true;
+                    promise = load();
+                }
+                return promise;
             },
             set(v) {
-                if (key === undefined)
+                if (key === undefined) {
                     throw new Error(
-                        'Cannot assign lazy session data because the session key was undefined!'
-                    )
-                wrote = true
-                fetching = false
-                value = v
+                        "Cannot assign lazy session data because the session key was undefined!",
+                    );
+                }
+                wrote = true;
+                fetching = false;
+                value = v;
             },
-        })
-        await next() // no catch: do not wrote back if middleware throws
+        });
+        await next(); // no catch: do not wrote back if middleware throws
         if (key !== undefined) {
-            if (read) await promise
+            if (read) await promise;
             if (read || wrote) {
-                value = await value
-                if (value == null) await storage.delete(key)
-                else await storage.write(key, value)
+                value = await value;
+                if (value == null) await storage.delete(key);
+                else await storage.write(key, value);
             }
         }
-    }
+    };
 }
 
 function defaultGetSessionKey(ctx: Context): string | undefined {
-    return ctx.chat?.id.toString()
+    return ctx.chat?.id.toString();
 }
 
 /**
@@ -327,10 +335,13 @@ function defaultGetSessionKey(ctx: Context): string | undefined {
  * `inital` option (or undefined) will be put into place.
  */
 export class MemorySessionStorage<S> implements StorageAdapter<S> {
-    private readonly storage = new Map<
+    /**
+     * Internally used `Map` instance that stores the session data
+     */
+    protected readonly storage = new Map<
         string,
         { session: S; expires?: number }
-    >()
+    >();
 
     /**
      * Constructs a new memory session storage with the given time to live. Note
@@ -341,30 +352,41 @@ export class MemorySessionStorage<S> implements StorageAdapter<S> {
     constructor(private readonly timeToLive = Infinity) {}
 
     read(key: string) {
-        const value = this.storage.get(key)
-        if (value === undefined) return undefined
+        const value = this.storage.get(key);
+        if (value === undefined) return undefined;
         if (value.expires !== undefined && value.expires < Date.now()) {
-            this.delete(key)
-            return undefined
+            this.delete(key);
+            return undefined;
         }
-        return value.session
+        return value.session;
+    }
+
+    /**
+     * Reads the values for all keys of the session storage, and returns them as
+     * an array.
+     */
+    readAll() {
+        return Array
+            .from(this.storage.keys())
+            .map((key) => this.read(key))
+            .filter((value): value is S => value !== undefined);
     }
 
     write(key: string, value: S) {
-        this.storage.set(key, this.addExpiryDate(value))
+        this.storage.set(key, this.addExpiryDate(value));
     }
 
     private addExpiryDate(value: S) {
-        const ttl = this.timeToLive
+        const ttl = this.timeToLive;
         if (ttl !== undefined && ttl < Infinity) {
-            const now = Date.now()
-            return { session: value, expires: now + ttl }
+            const now = Date.now();
+            return { session: value, expires: now + ttl };
         } else {
-            return { session: value }
+            return { session: value };
         }
     }
 
     delete(key: string) {
-        this.storage.delete(key)
+        this.storage.delete(key);
     }
 }

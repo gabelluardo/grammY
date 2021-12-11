@@ -11,19 +11,19 @@ import {
     InputMediaVideo,
     LabeledPrice,
     PassportElementError,
-} from '../platform.ts'
+} from "../platform.deno.ts";
 import {
-    createRawApi,
-    RawApi,
     ApiClientOptions,
+    createRawApi,
+    Methods,
+    Payload,
+    RawApi,
+    Transformer,
     TransformerConsumer,
     WebhookReplyEnvelope,
-    Transformer,
-    Payload,
-    Methods,
-} from './client.ts'
+} from "./client.ts";
 
-type AlwaysOmittedInOther = 'chat_id'
+type AlwaysOmittedInOther = "chat_id";
 /**
  * Helper type to derive remaining properties of a given API method call M,
  * given that some properties X have already been specified.
@@ -31,8 +31,8 @@ type AlwaysOmittedInOther = 'chat_id'
 export type Other<
     R extends RawApi,
     M extends Methods<R>,
-    X extends string = never
-> = Omit<Payload<M, R>, X | AlwaysOmittedInOther>
+    X extends string = never,
+> = Omit<Payload<M, R>, X | AlwaysOmittedInOther>;
 
 /**
  * This class provides access to the full Telegram Bot API. All methods of the
@@ -61,7 +61,7 @@ export class Api<R extends RawApi = RawApi> {
      * undocumented methods with arbitrary parameters—use only if you know what
      * you are doing.
      */
-    public readonly raw: R
+    public readonly raw: R;
 
     /**
      * Configuration object for the API instance, used as a namespace to
@@ -78,7 +78,7 @@ export class Api<R extends RawApi = RawApi> {
          * _Note that using transformer functions is an advanced feature of
          * grammY that most bots will not need to make use of._
          */
-        readonly use: TransformerConsumer<R>
+        readonly use: TransformerConsumer<R>;
         /**
          * Provides read access to all currently installed transformers (those
          * that have previously been passed to `config.use`).
@@ -86,24 +86,24 @@ export class Api<R extends RawApi = RawApi> {
          * _Note that using transformer functions is an advanced feature of
          * grammY that most bots will not need to make use of._
          */
-        readonly installedTransformers: () => Transformer<R>[]
-    }
+        readonly installedTransformers: () => Transformer<R>[];
+    };
 
     constructor(
         token: string,
         config?: ApiClientOptions,
-        webhookReplyEnvelope?: WebhookReplyEnvelope
+        webhookReplyEnvelope?: WebhookReplyEnvelope,
     ) {
         const { raw, use, installedTransformers } = createRawApi<R>(
             token,
             config,
-            webhookReplyEnvelope
-        )
-        this.raw = raw
+            webhookReplyEnvelope,
+        );
+        this.raw = raw;
         this.config = {
             use,
             installedTransformers: () => [...installedTransformers],
-        }
+        };
     }
 
     /**
@@ -118,8 +118,8 @@ export class Api<R extends RawApi = RawApi> {
      *
      * **Official reference:** https://core.telegram.org/bots/api#getupdates
      */
-    getUpdates(other?: Other<R, 'getUpdates'>, signal?: AbortSignal) {
-        return this.raw.getUpdates({ ...other }, signal)
+    getUpdates(other?: Other<R, "getUpdates">, signal?: AbortSignal) {
+        return this.raw.getUpdates({ ...other }, signal);
     }
 
     /**
@@ -142,10 +142,10 @@ export class Api<R extends RawApi = RawApi> {
      */
     setWebhook(
         url: string,
-        other?: Other<R, 'setWebhook', 'url'>,
-        signal?: AbortSignal
+        other?: Other<R, "setWebhook", "url">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.setWebhook({ url, ...other }, signal)
+        return this.raw.setWebhook({ url, ...other }, signal);
     }
 
     /**
@@ -156,8 +156,8 @@ export class Api<R extends RawApi = RawApi> {
      *
      * **Official reference:** https://core.telegram.org/bots/api#deletewebhook
      */
-    deleteWebhook(other?: Other<R, 'deleteWebhook'>, signal?: AbortSignal) {
-        return this.raw.deleteWebhook({ ...other }, signal)
+    deleteWebhook(other?: Other<R, "deleteWebhook">, signal?: AbortSignal) {
+        return this.raw.deleteWebhook({ ...other }, signal);
     }
 
     /**
@@ -168,18 +168,18 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getwebhookinfo
      */
     getWebhookInfo(signal?: AbortSignal) {
-        return this.raw.getWebhookInfo(signal)
+        return this.raw.getWebhookInfo(signal);
     }
 
     /**
-     * A simple method for testing your bot's auth token. Requires no parameters. Returns basic information about the bot in form of a User object.
+     * A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
      *
      * @param signal Optional `AbortSignal` to cancel the request
      *
      * **Official reference:** https://core.telegram.org/bots/api#getme
      */
     getMe(signal?: AbortSignal) {
-        return this.raw.getMe(signal)
+        return this.raw.getMe(signal);
     }
 
     /**
@@ -190,7 +190,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#logout
      */
     logOut(signal?: AbortSignal) {
-        return this.raw.logOut(signal)
+        return this.raw.logOut(signal);
     }
 
     /**
@@ -201,7 +201,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#close
      */
     close(signal?: AbortSignal) {
-        return this.raw.close(signal)
+        return this.raw.close(signal);
     }
 
     /**
@@ -217,10 +217,10 @@ export class Api<R extends RawApi = RawApi> {
     sendMessage(
         chat_id: number | string,
         text: string,
-        other?: Other<R, 'sendMessage', 'text'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendMessage", "text">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendMessage({ chat_id, text, ...other }, signal)
+        return this.raw.sendMessage({ chat_id, text, ...other }, signal);
     }
 
     /**
@@ -238,18 +238,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         from_chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'forwardMessage', 'from_chat_id' | 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "forwardMessage", "from_chat_id" | "message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.forwardMessage(
-            {
-                chat_id,
-                from_chat_id,
-                message_id,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, from_chat_id, message_id, ...other },
+            signal,
+        );
     }
 
     /**
@@ -267,18 +262,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         from_chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'copyMessage', 'from_chat_id' | 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "copyMessage", "from_chat_id" | "message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.copyMessage(
-            {
-                chat_id,
-                from_chat_id,
-                message_id,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, from_chat_id, message_id, ...other },
+            signal,
+        );
     }
 
     /**
@@ -294,10 +284,10 @@ export class Api<R extends RawApi = RawApi> {
     sendPhoto(
         chat_id: number | string,
         photo: InputFile | string,
-        other?: Other<R, 'sendPhoto', 'photo'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendPhoto", "photo">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendPhoto({ chat_id, photo, ...other }, signal)
+        return this.raw.sendPhoto({ chat_id, photo, ...other }, signal);
     }
 
     /**
@@ -315,10 +305,10 @@ export class Api<R extends RawApi = RawApi> {
     sendAudio(
         chat_id: number | string,
         audio: InputFile | string,
-        other?: Other<R, 'sendAudio', 'audio'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendAudio", "audio">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendAudio({ chat_id, audio, ...other }, signal)
+        return this.raw.sendAudio({ chat_id, audio, ...other }, signal);
     }
 
     /**
@@ -334,10 +324,10 @@ export class Api<R extends RawApi = RawApi> {
     sendDocument(
         chat_id: number | string,
         document: InputFile | string,
-        other?: Other<R, 'sendDocument', 'document'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendDocument", "document">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendDocument({ chat_id, document, ...other }, signal)
+        return this.raw.sendDocument({ chat_id, document, ...other }, signal);
     }
 
     /**
@@ -353,10 +343,10 @@ export class Api<R extends RawApi = RawApi> {
     sendVideo(
         chat_id: number | string,
         video: InputFile | string,
-        other?: Other<R, 'sendVideo', 'video'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendVideo", "video">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendVideo({ chat_id, video, ...other }, signal)
+        return this.raw.sendVideo({ chat_id, video, ...other }, signal);
     }
 
     /**
@@ -372,10 +362,10 @@ export class Api<R extends RawApi = RawApi> {
     sendAnimation(
         chat_id: number | string,
         animation: InputFile | string,
-        other?: Other<R, 'sendAnimation', 'animation'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendAnimation", "animation">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendAnimation({ chat_id, animation, ...other }, signal)
+        return this.raw.sendAnimation({ chat_id, animation, ...other }, signal);
     }
 
     /**
@@ -391,10 +381,10 @@ export class Api<R extends RawApi = RawApi> {
     sendVoice(
         chat_id: number | string,
         voice: InputFile | string,
-        other?: Other<R, 'sendVoice', 'voice'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendVoice", "voice">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendVoice({ chat_id, voice, ...other }, signal)
+        return this.raw.sendVoice({ chat_id, voice, ...other }, signal);
     }
 
     /**
@@ -411,10 +401,13 @@ export class Api<R extends RawApi = RawApi> {
     sendVideoNote(
         chat_id: number | string,
         video_note: InputFile | string,
-        other?: Other<R, 'sendVideoNote', 'video_note'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendVideoNote", "video_note">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendVideoNote({ chat_id, video_note, ...other }, signal)
+        return this.raw.sendVideoNote(
+            { chat_id, video_note, ...other },
+            signal,
+        );
     }
 
     /**
@@ -435,10 +428,10 @@ export class Api<R extends RawApi = RawApi> {
             | InputMediaPhoto
             | InputMediaVideo
         >,
-        other?: Other<R, 'sendMediaGroup', 'media'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendMediaGroup", "media">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendMediaGroup({ chat_id, media, ...other }, signal)
+        return this.raw.sendMediaGroup({ chat_id, media, ...other }, signal);
     }
 
     /**
@@ -456,13 +449,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         latitude: number,
         longitude: number,
-        other?: Other<R, 'sendLocation', 'latitude' | 'longitude'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendLocation", "latitude" | "longitude">,
+        signal?: AbortSignal,
     ) {
         return this.raw.sendLocation(
             { chat_id, latitude, longitude, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -484,21 +477,15 @@ export class Api<R extends RawApi = RawApi> {
         longitude: number,
         other?: Other<
             R,
-            'editMessageLiveLocation',
-            'message_id' | 'inline_message_id' | 'latitude' | 'longitude'
+            "editMessageLiveLocation",
+            "message_id" | "inline_message_id" | "latitude" | "longitude"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageLiveLocation(
-            {
-                chat_id,
-                message_id,
-                latitude,
-                longitude,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, message_id, latitude, longitude, ...other },
+            signal,
+        );
     }
 
     /**
@@ -518,20 +505,15 @@ export class Api<R extends RawApi = RawApi> {
         longitude: number,
         other?: Other<
             R,
-            'editMessageLiveLocation',
-            'message_id' | 'inline_message_id' | 'latitude' | 'longitude'
+            "editMessageLiveLocation",
+            "message_id" | "inline_message_id" | "latitude" | "longitude"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageLiveLocation(
-            {
-                inline_message_id,
-                latitude,
-                longitude,
-                ...other,
-            },
-            signal
-        )
+            { inline_message_id, latitude, longitude, ...other },
+            signal,
+        );
     }
 
     /**
@@ -549,19 +531,15 @@ export class Api<R extends RawApi = RawApi> {
         message_id: number,
         other?: Other<
             R,
-            'stopMessageLiveLocation',
-            'message_id' | 'inline_message_id'
+            "stopMessageLiveLocation",
+            "message_id" | "inline_message_id"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.stopMessageLiveLocation(
-            {
-                chat_id,
-                message_id,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, message_id, ...other },
+            signal,
+        );
     }
 
     /**
@@ -577,15 +555,15 @@ export class Api<R extends RawApi = RawApi> {
         inline_message_id: string,
         other?: Other<
             R,
-            'stopMessageLiveLocation',
-            'message_id' | 'inline_message_id'
+            "stopMessageLiveLocation",
+            "message_id" | "inline_message_id"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.stopMessageLiveLocation(
             { inline_message_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -609,22 +587,15 @@ export class Api<R extends RawApi = RawApi> {
         address: string,
         other?: Other<
             R,
-            'sendVenue',
-            'latitude' | 'longitude' | 'title' | 'address'
+            "sendVenue",
+            "latitude" | "longitude" | "title" | "address"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.sendVenue(
-            {
-                chat_id,
-                latitude,
-                longitude,
-                title,
-                address,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, latitude, longitude, title, address, ...other },
+            signal,
+        );
     }
 
     /**
@@ -642,18 +613,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         phone_number: string,
         first_name: string,
-        other?: Other<R, 'sendContact', 'phone_number' | 'first_name'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendContact", "phone_number" | "first_name">,
+        signal?: AbortSignal,
     ) {
         return this.raw.sendContact(
-            {
-                chat_id,
-                phone_number,
-                first_name,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, phone_number, first_name, ...other },
+            signal,
+        );
     }
 
     /**
@@ -671,13 +637,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         question: string,
         options: readonly string[],
-        other?: Other<R, 'sendPoll', 'question' | 'options'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendPoll", "question" | "options">,
+        signal?: AbortSignal,
     ) {
         return this.raw.sendPoll(
             { chat_id, question, options, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -693,10 +659,10 @@ export class Api<R extends RawApi = RawApi> {
     sendDice(
         chat_id: number | string,
         emoji: string,
-        other?: Other<R, 'sendDice', 'emoji'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendDice", "emoji">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendDice({ chat_id, emoji, ...other }, signal)
+        return this.raw.sendDice({ chat_id, emoji, ...other }, signal);
     }
 
     /**
@@ -707,7 +673,7 @@ export class Api<R extends RawApi = RawApi> {
      * We only recommend using this method when a response from the bot will take a noticeable amount of time to arrive.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
-     * @param action Type of action to broadcast. Choose one, depending on what the user is about to receive: typing for text messages, upload_photo for photos, record_video or upload_video for videos, record_voice or upload_voice for voice notes, upload_document for general files, find_location for location data, record_video_note or upload_video_note for video notes.
+     * @param action Type of action to broadcast. Choose one, depending on what the user is about to receive: typing for text messages, upload_photo for photos, record_video or upload_video for videos, record_voice or upload_voice for voice notes, upload_document for general files, choose_sticker for stickers, find_location for location data, record_video_note or upload_video_note for video notes.
      * @param signal Optional `AbortSignal` to cancel the request
      *
      * **Official reference:** https://core.telegram.org/bots/api#sendchataction
@@ -715,19 +681,19 @@ export class Api<R extends RawApi = RawApi> {
     sendChatAction(
         chat_id: number | string,
         action:
-            | 'typing'
-            | 'upload_photo'
-            | 'record_video'
-            | 'upload_video'
-            | 'record_voice'
-            | 'upload_voice'
-            | 'upload_document'
-            | 'find_location'
-            | 'record_video_note'
-            | 'upload_video_note',
-        signal?: AbortSignal
+            | "typing"
+            | "upload_photo"
+            | "record_video"
+            | "upload_video"
+            | "record_voice"
+            | "upload_voice"
+            | "upload_document"
+            | "find_location"
+            | "record_video_note"
+            | "upload_video_note",
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendChatAction({ chat_id, action }, signal)
+        return this.raw.sendChatAction({ chat_id, action }, signal);
     }
 
     /**
@@ -741,10 +707,10 @@ export class Api<R extends RawApi = RawApi> {
      */
     getUserProfilePhotos(
         user_id: number,
-        other?: Other<R, 'getUserProfilePhotos', 'user_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "getUserProfilePhotos", "user_id">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.getUserProfilePhotos({ user_id, ...other }, signal)
+        return this.raw.getUserProfilePhotos({ user_id, ...other }, signal);
     }
 
     /**
@@ -758,16 +724,16 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getfile
      */
     getFile(file_id: string, signal?: AbortSignal) {
-        return this.raw.getFile({ file_id }, signal)
+        return this.raw.getFile({ file_id }, signal);
     }
 
     /** @deprecated Use `banChatMember` instead. */
-    kickChatMember(...args: Parameters<Api['banChatMember']>) {
-        return this.banChatMember(...args)
+    kickChatMember(...args: Parameters<Api["banChatMember"]>) {
+        return this.banChatMember(...args);
     }
 
     /**
-     * Use this method to ban a user in a group, a supergroup or a channel. In the case of supergroups and channels, the user will not be able to return to the chat on their own using invite links, etc., unless unbanned first. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns True on success.
+     * Use this method to ban a user in a group, a supergroup or a channel. In the case of supergroups and channels, the user will not be able to return to the chat on their own using invite links, etc., unless unbanned first. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target group or username of the target supergroup or channel (in the format @channelusername)
      * @param user_id Unique identifier of the target user
@@ -779,10 +745,10 @@ export class Api<R extends RawApi = RawApi> {
     banChatMember(
         chat_id: number | string,
         user_id: number,
-        other?: Other<R, 'banChatMember', 'user_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "banChatMember", "user_id">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.banChatMember({ chat_id, user_id, ...other }, signal)
+        return this.raw.banChatMember({ chat_id, user_id, ...other }, signal);
     }
 
     /**
@@ -798,14 +764,14 @@ export class Api<R extends RawApi = RawApi> {
     unbanChatMember(
         chat_id: number | string,
         user_id: number,
-        other?: Other<R, 'unbanChatMember', 'user_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "unbanChatMember", "user_id">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.unbanChatMember({ chat_id, user_id, ...other }, signal)
+        return this.raw.unbanChatMember({ chat_id, user_id, ...other }, signal);
     }
 
     /**
-     * Use this method to restrict a user in a supergroup. The bot must be an administrator in the supergroup for this to work and must have the appropriate admin rights. Pass True for all permissions to lift restrictions from a user. Returns True on success.
+     * Use this method to restrict a user in a supergroup. The bot must be an administrator in the supergroup for this to work and must have the appropriate administrator rights. Pass True for all permissions to lift restrictions from a user. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target supergroup (in the format @supergroupusername)
      * @param user_id Unique identifier of the target user
@@ -819,22 +785,17 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         user_id: number,
         permissions: ChatPermissions,
-        other?: Other<R, 'restrictChatMember', 'user_id' | 'permissions'>,
-        signal?: AbortSignal
+        other?: Other<R, "restrictChatMember", "user_id" | "permissions">,
+        signal?: AbortSignal,
     ) {
         return this.raw.restrictChatMember(
-            {
-                chat_id,
-                user_id,
-                permissions,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, user_id, permissions, ...other },
+            signal,
+        );
     }
 
     /**
-     * Use this method to promote or demote a user in a supergroup or a channel. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Pass False for all boolean parameters to demote a user. Returns True on success.
+     * Use this method to promote or demote a user in a supergroup or a channel. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Pass False for all boolean parameters to demote a user. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param user_id Unique identifier of the target user
@@ -846,13 +807,13 @@ export class Api<R extends RawApi = RawApi> {
     promoteChatMember(
         chat_id: number | string,
         user_id: number,
-        other?: Other<R, 'promoteChatMember', 'user_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "promoteChatMember", "user_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.promoteChatMember(
             { chat_id, user_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -869,20 +830,53 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         user_id: number,
         custom_title: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.setChatAdministratorCustomTitle(
-            {
-                chat_id,
-                user_id,
-                custom_title,
-            },
-            signal
-        )
+            { chat_id, user_id, custom_title },
+            signal,
+        );
     }
 
     /**
-     * Use this method to set default chat permissions for all members. The bot must be an administrator in the group or a supergroup for this to work and must have the can_restrict_members admin rights. Returns True on success.
+     * Use this method to ban a channel chat in a supergroup or a channel. Until the chat is unbanned, the owner of the banned chat won't be able to send messages on behalf of any of their channels. The bot must be an administrator in the supergroup or channel for this to work and must have the appropriate administrator rights. Returns True on success.
+     *
+     * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+     * @param sender_chat_id Unique identifier of the target sender chat
+     * @param signal Optional `AbortSignal` to cancel the request
+     *
+     * **Official reference:** https://core.telegram.org/bots/api#banchatsenderchat
+     */
+    banChatSenderChat(
+        chat_id: number | string,
+        sender_chat_id: number,
+        signal?: AbortSignal,
+    ) {
+        return this.raw.banChatSenderChat({ chat_id, sender_chat_id }, signal);
+    }
+
+    /**
+     * Use this method to unban a previously banned channel chat in a supergroup or channel. The bot must be an administrator for this to work and must have the appropriate administrator rights. Returns True on success.
+     *
+     * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+     * @param sender_chat_id Unique identifier of the target sender chat
+     * @param signal Optional `AbortSignal` to cancel the request
+     *
+     * **Official reference:** https://core.telegram.org/bots/api#unbanchatsenderchat
+     */
+    unbanChatSenderChat(
+        chat_id: number | string,
+        sender_chat_id: number,
+        signal?: AbortSignal,
+    ) {
+        return this.raw.unbanChatSenderChat(
+            { chat_id, sender_chat_id },
+            signal,
+        );
+    }
+
+    /**
+     * Use this method to set default chat permissions for all members. The bot must be an administrator in the group or a supergroup for this to work and must have the can_restrict_members administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target supergroup (in the format @supergroupusername)
      * @param permissions New default chat permissions
@@ -893,13 +887,13 @@ export class Api<R extends RawApi = RawApi> {
     setChatPermissions(
         chat_id: number | string,
         permissions: ChatPermissions,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setChatPermissions({ chat_id, permissions }, signal)
+        return this.raw.setChatPermissions({ chat_id, permissions }, signal);
     }
 
     /**
-     * Use this method to generate a new primary invite link for a chat; any previously generated primary link is revoked. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns the new invite link as String on success.
+     * Use this method to generate a new primary invite link for a chat; any previously generated primary link is revoked. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns the new invite link as String on success.
      *
      * Note: Each administrator in a chat generates their own invite links. Bots can't use invite links generated by other administrators. If you want your bot to work with invite links, it will need to generate its own link using exportChatInviteLink or by calling the getChat method. If your bot needs to generate a new primary invite link replacing its previous one, use exportChatInviteLink again.
      *
@@ -909,11 +903,11 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#exportchatinvitelink
      */
     exportChatInviteLink(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.exportChatInviteLink({ chat_id }, signal)
+        return this.raw.exportChatInviteLink({ chat_id }, signal);
     }
 
     /**
-     * Use this method to create an additional invite link for a chat. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. The link can be revoked using the method revokeChatInviteLink. Returns the new invite link as ChatInviteLink object.
+     * Use this method to create an additional invite link for a chat. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. The link can be revoked using the method revokeChatInviteLink. Returns the new invite link as ChatInviteLink object.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param other Optional remaining parameters, confer the official reference below
@@ -923,14 +917,14 @@ export class Api<R extends RawApi = RawApi> {
      */
     createChatInviteLink(
         chat_id: number | string,
-        other?: Other<R, 'createChatInviteLink'>,
-        signal?: AbortSignal
+        other?: Other<R, "createChatInviteLink">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.createChatInviteLink({ chat_id, ...other }, signal)
+        return this.raw.createChatInviteLink({ chat_id, ...other }, signal);
     }
 
     /**
-     *  Use this method to edit a non-primary invite link created by the bot. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns the edited invite link as a ChatInviteLink object.
+     *  Use this method to edit a non-primary invite link created by the bot. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns the edited invite link as a ChatInviteLink object.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param invite_link The invite link to edit
@@ -942,17 +936,17 @@ export class Api<R extends RawApi = RawApi> {
     editChatInviteLink(
         chat_id: number | string,
         invite_link: string,
-        other?: Other<R, 'editChatInviteLink', 'invite_link'>,
-        signal?: AbortSignal
+        other?: Other<R, "editChatInviteLink", "invite_link">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editChatInviteLink(
             { chat_id, invite_link, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
-     *  Use this method to revoke an invite link created by the bot. If the primary link is revoked, a new link is automatically generated. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns the revoked invite link as ChatInviteLink object.
+     *  Use this method to revoke an invite link created by the bot. If the primary link is revoked, a new link is automatically generated. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns the revoked invite link as ChatInviteLink object.
      *
      * @param chat_id Unique identifier of the target chat or username of the target channel (in the format @channelusername)
      * @param invite_link The invite link to revoke
@@ -963,13 +957,47 @@ export class Api<R extends RawApi = RawApi> {
     revokeChatInviteLink(
         chat_id: number | string,
         invite_link: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.revokeChatInviteLink({ chat_id, invite_link }, signal)
+        return this.raw.revokeChatInviteLink({ chat_id, invite_link }, signal);
     }
 
     /**
-     * Use this method to set a new profile photo for the chat. Photos can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns True on success.
+     * Use this method to approve a chat join request. The bot must be an administrator in the chat for this to work and must have the can_invite_users administrator right. Returns True on success.
+     *
+     * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+     * @param user_id Unique identifier of the target user
+     * @param signal Optional `AbortSignal` to cancel the request
+     *
+     * **Official reference:** https://core.telegram.org/bots/api#approvechatjoinrequest
+     */
+    approveChatJoinRequest(
+        chat_id: number | string,
+        user_id: number,
+        signal?: AbortSignal,
+    ) {
+        return this.raw.approveChatJoinRequest({ chat_id, user_id }, signal);
+    }
+
+    /**
+     * Use this method to decline a chat join request. The bot must be an administrator in the chat for this to work and must have the can_invite_users administrator right. Returns True on success.
+     *
+     * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+     * @param user_id Unique identifier of the target user
+     * @param signal Optional `AbortSignal` to cancel the request
+     *
+     * **Official reference:** https://core.telegram.org/bots/api#declinechatjoinrequest
+     */
+    declineChatJoinRequest(
+        chat_id: number | string,
+        user_id: number,
+        signal?: AbortSignal,
+    ) {
+        return this.raw.declineChatJoinRequest({ chat_id, user_id }, signal);
+    }
+
+    /**
+     * Use this method to set a new profile photo for the chat. Photos can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param photo New chat photo, uploaded using multipart/form-data
@@ -980,13 +1008,13 @@ export class Api<R extends RawApi = RawApi> {
     setChatPhoto(
         chat_id: number | string,
         photo: InputFile,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setChatPhoto({ chat_id, photo }, signal)
+        return this.raw.setChatPhoto({ chat_id, photo }, signal);
     }
 
     /**
-     * Use this method to delete a chat photo. Photos can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns True on success.
+     * Use this method to delete a chat photo. Photos can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param signal Optional `AbortSignal` to cancel the request
@@ -994,11 +1022,11 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#deletechatphoto
      */
     deleteChatPhoto(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.deleteChatPhoto({ chat_id }, signal)
+        return this.raw.deleteChatPhoto({ chat_id }, signal);
     }
 
     /**
-     * Use this method to change the title of a chat. Titles can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns True on success.
+     * Use this method to change the title of a chat. Titles can't be changed for private chats. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param title New chat title, 1-255 characters
@@ -1009,13 +1037,13 @@ export class Api<R extends RawApi = RawApi> {
     setChatTitle(
         chat_id: number | string,
         title: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setChatTitle({ chat_id, title }, signal)
+        return this.raw.setChatTitle({ chat_id, title }, signal);
     }
 
     /**
-     * Use this method to change the description of a group, a supergroup or a channel. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Returns True on success.
+     * Use this method to change the description of a group, a supergroup or a channel. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param description New chat description, 0-255 characters
@@ -1026,13 +1054,13 @@ export class Api<R extends RawApi = RawApi> {
     setChatDescription(
         chat_id: number | string,
         description: string | undefined,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setChatDescription({ chat_id, description }, signal)
+        return this.raw.setChatDescription({ chat_id, description }, signal);
     }
 
     /**
-     * Use this method to add a message to the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' admin right in a supergroup or 'can_edit_messages' admin right in a channel. Returns True on success.
+     * Use this method to add a message to the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' administrator right in a supergroup or 'can_edit_messages' administrator right in a channel. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param message_id Identifier of a message to pin
@@ -1044,17 +1072,17 @@ export class Api<R extends RawApi = RawApi> {
     pinChatMessage(
         chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'pinChatMessage', 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "pinChatMessage", "message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.pinChatMessage(
             { chat_id, message_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
-     * Use this method to remove a message from the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' admin right in a supergroup or 'can_edit_messages' admin right in a channel. Returns True on success.
+     * Use this method to remove a message from the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' administrator right in a supergroup or 'can_edit_messages' administrator right in a channel. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param message_id Identifier of a message to unpin. If not specified, the most recent pinned message (by sending date) will be unpinned.
@@ -1066,13 +1094,13 @@ export class Api<R extends RawApi = RawApi> {
     unpinChatMessage(
         chat_id: number | string,
         message_id?: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.unpinChatMessage({ chat_id, message_id }, signal)
+        return this.raw.unpinChatMessage({ chat_id, message_id }, signal);
     }
 
     /**
-     * Use this method to clear the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' admin right in a supergroup or 'can_edit_messages' admin right in a channel. Returns True on success.
+     * Use this method to clear the list of pinned messages in a chat. If the chat is not a private chat, the bot must be an administrator in the chat for this to work and must have the 'can_pin_messages' administrator right in a supergroup or 'can_edit_messages' administrator right in a channel. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param signal Optional `AbortSignal` to cancel the request
@@ -1080,7 +1108,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#unpinallchatmessages
      */
     unpinAllChatMessages(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.unpinAllChatMessages({ chat_id }, signal)
+        return this.raw.unpinAllChatMessages({ chat_id }, signal);
     }
 
     /**
@@ -1092,7 +1120,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#leavechat
      */
     leaveChat(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.leaveChat({ chat_id }, signal)
+        return this.raw.leaveChat({ chat_id }, signal);
     }
 
     /**
@@ -1104,7 +1132,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getchat
      */
     getChat(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.getChat({ chat_id }, signal)
+        return this.raw.getChat({ chat_id }, signal);
     }
 
     /**
@@ -1116,12 +1144,12 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getchatadministrators
      */
     getChatAdministrators(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.getChatAdministrators({ chat_id }, signal)
+        return this.raw.getChatAdministrators({ chat_id }, signal);
     }
 
     /** @deprecated Use `getChatMemberCount` instead. */
-    getChatMembersCount(...args: Parameters<Api['getChatMemberCount']>) {
-        return this.getChatMemberCount(...args)
+    getChatMembersCount(...args: Parameters<Api["getChatMemberCount"]>) {
+        return this.getChatMemberCount(...args);
     }
 
     /**
@@ -1133,7 +1161,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getchatmembercount
      */
     getChatMemberCount(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.getChatMemberCount({ chat_id }, signal)
+        return this.raw.getChatMemberCount({ chat_id }, signal);
     }
 
     /**
@@ -1148,13 +1176,13 @@ export class Api<R extends RawApi = RawApi> {
     getChatMember(
         chat_id: number | string,
         user_id: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.getChatMember({ chat_id, user_id }, signal)
+        return this.raw.getChatMember({ chat_id, user_id }, signal);
     }
 
     /**
-     * Use this method to set a new group sticker set for a supergroup. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Use the field can_set_sticker_set ly returned in getChat requests to check if the bot can use this method. Returns True on success.
+     * Use this method to set a new group sticker set for a supergroup. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Use the field can_set_sticker_set ly returned in getChat requests to check if the bot can use this method. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target supergroup (in the format @supergroupusername)
      * @param sticker_set_name Name of the sticker set to be set as the group sticker set
@@ -1165,19 +1193,16 @@ export class Api<R extends RawApi = RawApi> {
     setChatStickerSet(
         chat_id: number | string,
         sticker_set_name: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.setChatStickerSet(
-            {
-                chat_id,
-                sticker_set_name,
-            },
-            signal
-        )
+            { chat_id, sticker_set_name },
+            signal,
+        );
     }
 
     /**
-     * Use this method to delete a group sticker set from a supergroup. The bot must be an administrator in the chat for this to work and must have the appropriate admin rights. Use the field can_set_sticker_set ly returned in getChat requests to check if the bot can use this method. Returns True on success.
+     * Use this method to delete a group sticker set from a supergroup. The bot must be an administrator in the chat for this to work and must have the appropriate administrator rights. Use the field can_set_sticker_set ly returned in getChat requests to check if the bot can use this method. Returns True on success.
      *
      * @param chat_id Unique identifier for the target chat or username of the target supergroup (in the format @supergroupusername)
      * @param signal Optional `AbortSignal` to cancel the request
@@ -1185,7 +1210,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#deletechatstickerset
      */
     deleteChatStickerSet(chat_id: number | string, signal?: AbortSignal) {
-        return this.raw.deleteChatStickerSet({ chat_id }, signal)
+        return this.raw.deleteChatStickerSet({ chat_id }, signal);
     }
 
     /**
@@ -1201,13 +1226,13 @@ export class Api<R extends RawApi = RawApi> {
      */
     answerCallbackQuery(
         callback_query_id: string,
-        other?: Other<R, 'answerCallbackQuery', 'callback_query_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "answerCallbackQuery", "callback_query_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.answerCallbackQuery(
             { callback_query_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1221,10 +1246,10 @@ export class Api<R extends RawApi = RawApi> {
      */
     setMyCommands(
         commands: readonly BotCommand[],
-        other?: Other<R, 'setMyCommands', 'commands'>,
-        signal?: AbortSignal
+        other?: Other<R, "setMyCommands", "commands">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.setMyCommands({ commands, ...other }, signal)
+        return this.raw.setMyCommands({ commands, ...other }, signal);
     }
 
     /**
@@ -1236,10 +1261,10 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#deletemycommands
      */
     deleteMyCommands(
-        other?: Other<R, 'deleteMyCommands'>,
-        signal?: AbortSignal
+        other?: Other<R, "deleteMyCommands">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.deleteMyCommands({ ...other }, signal)
+        return this.raw.deleteMyCommands({ ...other }, signal);
     }
 
     /**
@@ -1250,8 +1275,8 @@ export class Api<R extends RawApi = RawApi> {
      *
      * **Official reference:** https://core.telegram.org/bots/api#getmycommands
      */
-    getMyCommands(other?: Other<R, 'getMyCommands'>, signal?: AbortSignal) {
-        return this.raw.getMyCommands({ ...other }, signal)
+    getMyCommands(other?: Other<R, "getMyCommands">, signal?: AbortSignal) {
+        return this.raw.getMyCommands({ ...other }, signal);
     }
 
     /**
@@ -1269,13 +1294,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         message_id: number,
         text: string,
-        other?: Other<R, 'editMessageText', 'message_id' | 'text'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageText", "message_id" | "text">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageText(
             { chat_id, message_id, text, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1290,13 +1315,13 @@ export class Api<R extends RawApi = RawApi> {
     editMessageTextInline(
         inline_message_id: string,
         text: string,
-        other?: Other<R, 'editMessageText', 'inline_message_id' | 'text'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageText", "inline_message_id" | "text">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageText(
             { inline_message_id, text, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1312,13 +1337,13 @@ export class Api<R extends RawApi = RawApi> {
     editMessageCaption(
         chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'editMessageCaption', 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageCaption", "message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageCaption(
             { chat_id, message_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1332,13 +1357,13 @@ export class Api<R extends RawApi = RawApi> {
      */
     editMessageCaptionInline(
         inline_message_id: string,
-        other?: Other<R, 'editMessageCaption', 'inline_message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageCaption", "inline_message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageCaption(
             { inline_message_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1356,18 +1381,13 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number | string,
         message_id: number,
         media: InputMedia,
-        other?: Other<R, 'editMessageMedia', 'message_id' | 'media'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageMedia", "message_id" | "media">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageMedia(
-            {
-                chat_id,
-                message_id,
-                media,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, message_id, media, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1383,13 +1403,13 @@ export class Api<R extends RawApi = RawApi> {
     editMessageMediaInline(
         inline_message_id: string,
         media: InputMedia,
-        other?: Other<R, 'editMessageMedia', 'inline_message_id' | 'media'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageMedia", "inline_message_id" | "media">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageMedia(
             { inline_message_id, media, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1405,17 +1425,13 @@ export class Api<R extends RawApi = RawApi> {
     editMessageReplyMarkup(
         chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'editMessageReplyMarkup', 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageReplyMarkup", "message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageReplyMarkup(
-            {
-                chat_id,
-                message_id,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, message_id, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1429,13 +1445,13 @@ export class Api<R extends RawApi = RawApi> {
      */
     editMessageReplyMarkupInline(
         inline_message_id: string,
-        other?: Other<R, 'editMessageReplyMarkup', 'inline_message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "editMessageReplyMarkup", "inline_message_id">,
+        signal?: AbortSignal,
     ) {
         return this.raw.editMessageReplyMarkup(
             { inline_message_id, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1451,10 +1467,10 @@ export class Api<R extends RawApi = RawApi> {
     stopPoll(
         chat_id: number | string,
         message_id: number,
-        other?: Other<R, 'stopPoll', 'message_id'>,
-        signal?: AbortSignal
+        other?: Other<R, "stopPoll", "message_id">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.stopPoll({ chat_id, message_id, ...other }, signal)
+        return this.raw.stopPoll({ chat_id, message_id, ...other }, signal);
     }
 
     /**
@@ -1477,9 +1493,9 @@ export class Api<R extends RawApi = RawApi> {
     deleteMessage(
         chat_id: number | string,
         message_id: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.deleteMessage({ chat_id, message_id }, signal)
+        return this.raw.deleteMessage({ chat_id, message_id }, signal);
     }
 
     /**
@@ -1495,10 +1511,10 @@ export class Api<R extends RawApi = RawApi> {
     sendSticker(
         chat_id: number | string,
         sticker: InputFile | string,
-        other?: Other<R, 'sendSticker', 'sticker'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendSticker", "sticker">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendSticker({ chat_id, sticker, ...other }, signal)
+        return this.raw.sendSticker({ chat_id, sticker, ...other }, signal);
     }
 
     /**
@@ -1510,7 +1526,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#getstickerset
      */
     getStickerSet(name: string, signal?: AbortSignal) {
-        return this.raw.getStickerSet({ name }, signal)
+        return this.raw.getStickerSet({ name }, signal);
     }
 
     /**
@@ -1525,9 +1541,9 @@ export class Api<R extends RawApi = RawApi> {
     uploadStickerFile(
         user_id: number,
         png_sticker: InputFile,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.uploadStickerFile({ user_id, png_sticker }, signal)
+        return this.raw.uploadStickerFile({ user_id, png_sticker }, signal);
     }
 
     /**
@@ -1549,21 +1565,15 @@ export class Api<R extends RawApi = RawApi> {
         emojis: string,
         other?: Other<
             R,
-            'createNewStickerSet',
-            'user_id' | 'name' | 'title' | 'emojis'
+            "createNewStickerSet",
+            "user_id" | "name" | "title" | "emojis"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.createNewStickerSet(
-            {
-                user_id,
-                name,
-                title,
-                emojis,
-                ...other,
-            },
-            signal
-        )
+            { user_id, name, title, emojis, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1581,13 +1591,13 @@ export class Api<R extends RawApi = RawApi> {
         user_id: number,
         name: string,
         emojis: string,
-        other?: Other<R, 'addStickerToSet', 'user_id' | 'name' | 'emojis'>,
-        signal?: AbortSignal
+        other?: Other<R, "addStickerToSet", "user_id" | "name" | "emojis">,
+        signal?: AbortSignal,
     ) {
         return this.raw.addStickerToSet(
             { user_id, name, emojis, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1602,9 +1612,9 @@ export class Api<R extends RawApi = RawApi> {
     setStickerPositionInSet(
         sticker: string,
         position: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setStickerPositionInSet({ sticker, position }, signal)
+        return this.raw.setStickerPositionInSet({ sticker, position }, signal);
     }
 
     /**
@@ -1616,7 +1626,7 @@ export class Api<R extends RawApi = RawApi> {
      * **Official reference:** https://core.telegram.org/bots/api#deletestickerfromset
      */
     deleteStickerFromSet(sticker: string, signal?: AbortSignal) {
-        return this.raw.deleteStickerFromSet({ sticker }, signal)
+        return this.raw.deleteStickerFromSet({ sticker }, signal);
     }
 
     /**
@@ -1633,16 +1643,16 @@ export class Api<R extends RawApi = RawApi> {
         name: string,
         user_id: number,
         thumb: InputFile | string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setStickerSetThumb({ name, user_id, thumb }, signal)
+        return this.raw.setStickerSetThumb({ name, user_id, thumb }, signal);
     }
 
     /**
      * Use this method to send answers to an inline query. On success, True is returned.
      * No more than 50 results per query are allowed.
      *
-     * Example: An inline bot that sends YouTube videos can ask the user to connect the bot to their YouTube account to adapt search results accordingly. To do this, it displays a 'Connect your YouTube account' button above the results, or even before showing any. The user presses the button, switches to a private chat with the bot and, in doing so, passes a start parameter that instructs the bot to return an oauth link. Once done, the bot can offer a switch_inline button so that the user can easily return to the chat where they wanted to use the bot's inline capabilities.
+     * Example: An inline bot that sends YouTube videos can ask the user to connect the bot to their YouTube account to adapt search results accordingly. To do this, it displays a 'Connect your YouTube account' button above the results, or even before showing any. The user presses the button, switches to a private chat with the bot and, in doing so, passes a start parameter that instructs the bot to return an OAuth link. Once done, the bot can offer a switch_inline button so that the user can easily return to the chat where they wanted to use the bot's inline capabilities.
      *
      * @param inline_query_id Unique identifier for the answered query
      * @param results An array of results for the inline query
@@ -1654,17 +1664,13 @@ export class Api<R extends RawApi = RawApi> {
     answerInlineQuery(
         inline_query_id: string,
         results: readonly InlineQueryResult[],
-        other?: Other<R, 'answerInlineQuery', 'inline_query_id' | 'results'>,
-        signal?: AbortSignal
+        other?: Other<R, "answerInlineQuery", "inline_query_id" | "results">,
+        signal?: AbortSignal,
     ) {
         return this.raw.answerInlineQuery(
-            {
-                inline_query_id,
-                results,
-                ...other,
-            },
-            signal
-        )
+            { inline_query_id, results, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1692,16 +1698,15 @@ export class Api<R extends RawApi = RawApi> {
         prices: readonly LabeledPrice[],
         other?: Other<
             R,
-            'sendInvoice',
-            | 'title'
-            | 'description'
-            | 'payload'
-            | 'provider_token'
-            | 'start_parameter'
-            | 'currency'
-            | 'prices'
+            "sendInvoice",
+            | "title"
+            | "description"
+            | "payload"
+            | "provider_token"
+            | "currency"
+            | "prices"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.sendInvoice(
             {
@@ -1714,8 +1719,8 @@ export class Api<R extends RawApi = RawApi> {
                 prices,
                 ...other,
             },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1731,13 +1736,13 @@ export class Api<R extends RawApi = RawApi> {
     answerShippingQuery(
         shipping_query_id: string,
         ok: boolean,
-        other?: Other<R, 'answerShippingQuery', 'shipping_query_id' | 'ok'>,
-        signal?: AbortSignal
+        other?: Other<R, "answerShippingQuery", "shipping_query_id" | "ok">,
+        signal?: AbortSignal,
     ) {
         return this.raw.answerShippingQuery(
             { shipping_query_id, ok, ...other },
-            signal
-        )
+            signal,
+        );
     }
 
     /**
@@ -1755,19 +1760,15 @@ export class Api<R extends RawApi = RawApi> {
         ok: boolean,
         other?: Other<
             R,
-            'answerPreCheckoutQuery',
-            'pre_checkout_query_id' | 'ok'
+            "answerPreCheckoutQuery",
+            "pre_checkout_query_id" | "ok"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.answerPreCheckoutQuery(
-            {
-                pre_checkout_query_id,
-                ok,
-                ...other,
-            },
-            signal
-        )
+            { pre_checkout_query_id, ok, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1784,9 +1785,9 @@ export class Api<R extends RawApi = RawApi> {
     setPassportDataErrors(
         user_id: number,
         errors: readonly PassportElementError[],
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
-        return this.raw.setPassportDataErrors({ user_id, errors }, signal)
+        return this.raw.setPassportDataErrors({ user_id, errors }, signal);
     }
 
     /**
@@ -1802,10 +1803,13 @@ export class Api<R extends RawApi = RawApi> {
     sendGame(
         chat_id: number,
         game_short_name: string,
-        other?: Other<R, 'sendGame', 'game_short_name'>,
-        signal?: AbortSignal
+        other?: Other<R, "sendGame", "game_short_name">,
+        signal?: AbortSignal,
     ) {
-        return this.raw.sendGame({ chat_id, game_short_name, ...other }, signal)
+        return this.raw.sendGame(
+            { chat_id, game_short_name, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1825,19 +1829,13 @@ export class Api<R extends RawApi = RawApi> {
         message_id: number,
         user_id: number,
         score: number,
-        other?: Other<R, 'setGameScore', 'message_id' | 'user_id' | 'score'>,
-        signal?: AbortSignal
+        other?: Other<R, "setGameScore", "message_id" | "user_id" | "score">,
+        signal?: AbortSignal,
     ) {
         return this.raw.setGameScore(
-            {
-                chat_id,
-                message_id,
-                user_id,
-                score,
-                ...other,
-            },
-            signal
-        )
+            { chat_id, message_id, user_id, score, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1857,20 +1855,15 @@ export class Api<R extends RawApi = RawApi> {
         score: number,
         other?: Other<
             R,
-            'setGameScore',
-            'inline_message_id' | 'user_id' | 'score'
+            "setGameScore",
+            "inline_message_id" | "user_id" | "score"
         >,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.setGameScore(
-            {
-                inline_message_id,
-                user_id,
-                score,
-                ...other,
-            },
-            signal
-        )
+            { inline_message_id, user_id, score, ...other },
+            signal,
+        );
     }
 
     /**
@@ -1889,16 +1882,12 @@ export class Api<R extends RawApi = RawApi> {
         chat_id: number,
         message_id: number,
         user_id: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.getGameHighScores(
-            {
-                chat_id,
-                message_id,
-                user_id,
-            },
-            signal
-        )
+            { chat_id, message_id, user_id },
+            signal,
+        );
     }
 
     /**
@@ -1915,14 +1904,11 @@ export class Api<R extends RawApi = RawApi> {
     getGameHighScoresInline(
         inline_message_id: string,
         user_id: number,
-        signal?: AbortSignal
+        signal?: AbortSignal,
     ) {
         return this.raw.getGameHighScores(
-            {
-                inline_message_id,
-                user_id,
-            },
-            signal
-        )
+            { inline_message_id, user_id },
+            signal,
+        );
     }
 }
