@@ -1,4 +1,3 @@
-import { InlineKeyboard, Keyboard } from "./keyboard.ts";
 import { Context } from "../context.ts";
 import {
     Composer,
@@ -6,447 +5,209 @@ import {
     MiddlewareFn,
     MiddlewareObj,
 } from "../composer.ts";
-import { session, SessionFlavor } from "./session.ts";
-import { Bot } from "../bot.ts";
+import { SessionFlavor } from "./session.ts";
 import { Filter, FilterQuery } from "../filter.ts";
 
-////////////////////////////////////////////////////
-/////                   IMPL                   /////
-////////////////////////////////////////////////////
+interface ConversationSessionData {
+    conversation?: { stack: StackFrame[]; replayIndex?: number };
+}
 
-type MyContext =
+interface StackFrame {
+    id: string;
+    pc: number;
+}
+
+interface ConversationControls {
+    enter(identifier: string): void;
+    exit(): void;
+}
+
+const main = Symbol();
+
+export type ConversationFlavor =
+    & { conversation: ConversationControls; [main]?: true }
+    & SessionFlavor<ConversationSessionData>;
+
+type ConversationContext =
     & Context
     & ConversationFlavor
-    & SessionFlavor<{ token?: string; app?: string; desc?: string }>;
+    & SessionFlavor<Required<ConversationSessionData>>;
 
-export interface ConversationFlavor {
-    session?: {
-        conversation?: { active: string; step: string | number };
-    };
-    conversation: {
-        enter: (identifier: string, step?: string) => Promise<void>;
-        leave: () => Promise<void>;
-        back: (steps?: number) => Promise<void>;
-        forward: (steps?: number) => Promise<void>;
-        diveOut: (depth?: number) => Promise<void>;
-        switch: (identifier: string) => Promise<void>;
-    };
-}
+class ShallowConversation<C extends ConversationContext> {
+    constructor(
+        public readonly identifier: string,
+        protected readonly composer = new Composer<C>(),
+        protected index = new Array<Middleware<C>>(),
+    ) {}
 
-type Id = string | number;
-type ConversationContext = Context & ConversationFlavor & SessionFlavor<object>;
-
-const internal = Symbol();
-type Internal = typeof internal;
-
-class Step<C extends ConversationContext> {
-    [internal]: {
-        root: Conversation<C> | undefined;
-        mw: Composer<C> | undefined;
-    } = { root: undefined, mw: undefined };
-}
-
-export class Conversation<C extends ConversationContext> extends Step<C>
-    implements MiddlewareObj<C> {
-    private identifier: Id | undefined = undefined;
-
-    private step: Step<C> = new Step();
-
-    private head: Conversation<C> | null = null;
-    private tail: Conversation<C> | null = null;
-
-    private parent: Conversation<C> | null = null;
-    private prev: Conversation<C> | null = null;
-    private next: Conversation<C> | null = null;
-
-    private index: Map<Id, Conversation<C>> = new Map();
-
-    private mw: Composer<C> | undefined;
-
-    constructor(identifier: string | Internal) {
-        super();
-        console.log(identifier, new Error().stack);
-        if (identifier !== internal) this.id = identifier;
-        this.step[internal].root = this;
-    }
-
-    public get id(): string {
-        if (typeof this.identifier === "string") return this.identifier;
-        else throw new Error("Anonymous conversations do not have identifiers");
-    }
-    private set id(id: Id) {
-        if (this.identifier !== undefined) {
-            throw new Error(
-                `Cannot change existing conversation identifier '${this.identifier}'!`,
-            );
-        }
-        this.identifier = id;
-        this.index.set(id, this);
-    }
-
-    public get domain(): Conversation<C> {
-        const conv = this.index.values().next().value;
-        if (conv === undefined) throw new Error(`Unknown domain!`);
-        return conv;
-    }
-
-    private add(node: Conversation<C>) {
-        if (this.tail === null) {
-            throw new Error("Cannot call `wait` without any middleware!");
-        }
-        node.prev = this.tail;
-        node.parent = this;
-        node.index = this.index;
-        this.tail.next = node;
-        this.tail = node;
-    }
-
-    wait(id?: string) {
-        id ??= this.index.size as unknown as string; // permit `number` only internally
-        const node = new Conversation<C>(id);
-        this.add(node);
-        return node;
-    }
-
-    diveIn(id?: string) {
-        this.id = id ?? this.index.size;
-        console.log(
-            this.parent?.identifier,
-            "now has a child",
-            this.identifier,
-        );
-        return this;
-    }
-
-    private wrapComposer<D extends C>(op: (comp: Composer<C>) => Composer<D>) {
-        if (this.head === null || this.tail === null) {
-            (this.head = this.tail = new Conversation(internal)).parent = this;
-        }
-        const dive = this.tail;
-        dive.mw ??= new Composer(async (ctx, next) => {
-            console.log(
-                "Running middleware of",
-                dive.identifier,
-                "under",
-                dive.parent,
-            );
-            if (dive.identifier !== undefined) {
-                await this.changeStep(ctx, dive.identifier);
-            }
-            await next();
+    wait() {
+        return this.use(() => {
+            // do nothing, stop propagating update when reaching wait call
         });
-        const node = new Conversation<D>(internal);
-        node.mw = op(dive.mw);
-        const middlewareRoot = node as unknown as Conversation<C>;
-        middlewareRoot.head = this.head;
-        middlewareRoot.tail = this.tail;
-        middlewareRoot.parent = this;
-        middlewareRoot.prev = this.prev;
-        middlewareRoot.next = this.next;
-        middlewareRoot.index = this.index;
-        return node;
     }
 
-    use(...middleware: Array<Middleware<C>>): Conversation<C> {
-        return this.wrapComposer((c) => c.use(...middleware));
+    private setPc<D extends C>(pc: number): MiddlewareFn<D> {
+        return (ctx, next) => {
+            const stack = ctx.session.conversation.stack;
+            if (stack.length === 0) {
+                throw new Error(
+                    `Fatal: Empty stack while incpc to ${pc} at ${this.identifier}!`,
+                );
+            }
+            stack[stack.length - 1].pc = pc;
+            return next();
+        };
     }
 
-    filter(pred: (ctx: C) => boolean, ...middleware: Array<Middleware<C>>) {
-        return this.wrapComposer((c) => c.filter(pred, ...middleware));
+    private *register<D extends C>(
+        middleware: Array<Middleware<D>>,
+    ): Generator<Middleware<D>> {
+        for (const m of middleware) {
+            const ic = this.index.length; // next instruction count
+            const pcUpd = this.setPc(ic);
+            this.index.push(pcUpd);
+            yield pcUpd;
+            yield m;
+        }
+    }
+
+    use(...middleware: Array<Middleware<C>>): ShallowConversation<C> {
+        return new ShallowConversation<C>(
+            this.identifier,
+            this.composer.use(...this.register(middleware)),
+            this.index,
+        );
+    }
+
+    filter(
+        pred: (ctx: C) => boolean,
+        ...middleware: Array<Middleware<C>>
+    ): ShallowConversation<C> {
+        return new ShallowConversation(
+            this.identifier,
+            this.composer.filter(pred, ...this.register(middleware)),
+            this.index,
+        );
     }
 
     on<Q extends FilterQuery>(
         filter: Q | Q[],
         ...middleware: Array<Middleware<Filter<C, Q>>>
-    ): Conversation<Filter<C, Q>> {
-        return this.wrapComposer((c) => c.on(filter, ...middleware));
+    ): ShallowConversation<Filter<C, Q>> {
+        return new ShallowConversation(
+            this.identifier,
+            this.composer.on(filter, ...this.register(middleware)),
+            this.index,
+        );
     }
-    hears(h: string | RegExp, ...middleware: Array<Middleware<C>>) {
-        return this.wrapComposer((c) => c.hears(h, ...middleware));
-    }
-    command(h: string, ...middleware: Array<Middleware<C>>) {
-        return this.wrapComposer((c) => c.command(h, ...middleware));
-    }
-    callbackQuery(h: string, ...middleware: Array<Middleware<C>>) {
-        return this.wrapComposer((c) => c.callbackQuery(h, ...middleware));
-    }
+    // hears(h: string | RegExp, ...middleware: Array<Middleware<C>>): ShallowConversation<Filter<C, Q>> {
+    //     return this.wrapComposer((c) => c.hears(h, ...middleware));
+    // }
+    // command(h: string, ...middleware: Array<Middleware<C>>): ShallowConversation<Filter<C, Q>> {
+    //     return this.wrapComposer((c) => c.command(h, ...middleware));
+    // }
+    // callbackQuery(h: string, ...middleware: Array<Middleware<C>>): ShallowConversation<Filter<C, Q>> {
+    //     return this.wrapComposer((c) => c.callbackQuery(h, ...middleware));
+    // }
+}
 
-    private changeStep(ctx: C, step: Id) {
-        if (ctx.session.conversation === undefined) {
-            ctx.session.conversation = { active: this.domain.id, step };
-        } else ctx.session.conversation.step = step;
-        return Promise.resolve();
-    }
-
-    private installNavigation(ctx: C) {
-        ctx.conversation = {
-            // enter: (identifier: string) => Promise<void>
-            enter: (identifier, step) => {
-                ctx.session.conversation = {
-                    active: identifier,
-                    step: step ?? 0,
-                };
-                return Promise.resolve();
-            },
-            // leave: () => Promise<void>
-            leave: () => {
-                delete ctx.session.conversation;
-                return Promise.resolve();
-            },
-            // back: (steps?: number) => Promise<void>
-            back: (steps = 1) => {
-                let node: Conversation<C> | null = this;
-                for (; steps > 0; steps--, node = node.prev) {
-                    if (node.prev === null) {
-                        throw new Error(
-                            `Reached beginning, cannot go another ${steps} steps back!`,
-                        );
-                    }
-                }
-                return this.changeStep(ctx, node.id);
-            },
-            // forward: (steps?: number) => Promise<void>
-            forward: (steps = 1) => {
-                let node: Conversation<C> | null = this;
-                for (; steps > 0; steps--, node = node.next) {
-                    if (node.next === null) {
-                        throw new Error(
-                            `Reached end, cannot go another ${steps} steps forward!`,
-                        );
-                    }
-                }
-                return this.changeStep(ctx, node.id);
-            },
-            // diveOut: (depth?: number) => Promise<void>
-            diveOut: (depth = 1) => {
-                let node: Conversation<C> | null = this;
-                for (; depth > 0; depth--, node = node?.parent) {
-                    if (node.parent === null) {
-                        throw new Error(
-                            `Reached top, cannot dive out another ${depth} times!`,
-                        );
-                    }
-                }
-                return this.changeStep(ctx, node.id);
-            },
-            // switch: (identifier: string) => Promise<void>
-            switch: (identifier) => {
-                if (!this.index.has(identifier)) {
-                    throw new Error(
-                        `Step '${identifier}' is unknown. Did you mean to enter a different conversation?`,
-                    );
-                }
-                return this.changeStep(ctx, identifier);
-            },
-        };
+export class Conversation<C extends ConversationContext>
+    extends ShallowConversation<C>
+    implements MiddlewareObj<C> {
+    constructor(identifier: string) {
+        super(identifier);
     }
 
     middleware(): MiddlewareFn<C> {
-        return (ctx, next) => {
-            if (ctx.conversation === undefined) this.installNavigation(ctx);
+        return async (ctx, next) => {
+            const id = this.identifier;
+            let runTarget: Middleware<C> = this.composer;
 
-            const session = ctx.session;
-            const conversation = session.conversation;
-            if (conversation === undefined) return next();
-            const { active, step } = conversation;
-            const domain = this.domain;
-            if (active !== domain.id) return next();
-            let target: Conversation<C>;
-            if (step === 0) {
-                const t = domain.head;
-                if (t === null) {
+            const conversation = ctx.session.conversation;
+            const stack = conversation.stack;
+
+            async function call() {
+                enter(id);
+                await run();
+            }
+            async function run() {
+                const flat = new Composer(runTarget).middleware();
+                await flat(ctx, () => (leave(), next()));
+            }
+
+            // Define and install common operations
+            function enter(id: string) {
+                if (main in ctx) {
                     throw new Error(
-                        `Cannot enter '${active}' because it is empty`,
+                        "Already in conversation, cannot enter another one",
                     );
                 }
-                target = t;
-            } else {
-                const t = this.index.get(step);
-                if (t === undefined) {
-                    throw new Error(
-                        `Cannot find '${step}' under '${domain.id}'`,
-                    );
+                ctx[main] = true;
+                stack.push({ id, pc: 0 });
+            }
+            function leave() {
+                stack.pop();
+                if (stack.length === 0) delete ctx[main];
+            }
+            function exit() {
+                delete (ctx.session as Partial<typeof ctx.session>)
+                    .conversation;
+            }
+            ctx.conversation ??= { enter, exit }; // omit leave
+
+            // A conversation is already running, only perform function call
+            if (main in ctx) {
+                await call();
+                return;
+            }
+
+            // We are a stack frame in an ongoing replay operation
+            if (conversation.replayIndex !== undefined) {
+                // We are the final frame
+                if (conversation.replayIndex === stack.length - 1) {
+                    // Resume execution one handler later than last time
+                    runTarget = this.index[conversation.replayIndex + 1];
+                    // Store that the replay operation is complete now
+                    ctx[main] = true;
+                    delete conversation.replayIndex;
+                } else {
+                    // Resume execution exactly at same instruction
+                    runTarget = this.index[conversation.replayIndex];
                 }
-                if (t.id !== step) throw new Error("Index out of sync");
-                target = t;
+                await run();
+                return;
             }
-            if (target.mw === undefined) {
-                throw new Error(
-                    `Selected step '${target.id}' has no middleware`,
-                );
+
+            // We are installed on regular middleware. Currently, no
+            // conversation is running.
+
+            // If we are not in a conversation, call downstream middleware
+            let nextCalled = false;
+            if (stack.length === 0) {
+                await next();
+                nextCalled = true;
             }
-            return target.mw.middleware()(ctx, next);
+
+            // If the downstream middleware did not enter us, we are done
+            if (stack.length === 0) return;
+
+            // We should be in a conversation now, but we are not. Hence, we
+            // enter one by replaying the stack and beginning execution.
+            const bottom = stack[0];
+
+            // Do not handle things if we are not responsible
+            if (bottom.id !== id) {
+                if (!nextCalled) await next();
+                return;
+            }
+
+            // Start replaying the stack.
+            conversation.replayIndex = 0;
+            // In case we were previously entered from downstream middleware, we
+            // have to make sure not to call downstream middleware again after
+            // completing execution. We simply pass a no-op for `next`.
+            const nextNext = nextCalled ? () => Promise.resolve() : next;
+            await this.middleware()(ctx, nextNext); // recurse once
         };
     }
 }
-
-////////////////////////////////////////////////////
-/////                EXAMPLES                  /////
-////////////////////////////////////////////////////
-
-// +++ EXAMPLE 1 (id, token, description form) +++
-
-const bot = new Bot<MyContext>("");
-bot.use(session());
-
-bot.command("start", (ctx) => ctx.reply("Hi! Send /setup to start"));
-bot.command("help", (ctx) => ctx.reply("Imagine fancy help text here"));
-bot.command("setup", async (ctx) => {
-    ctx.conversation.enter("setup");
-    await ctx.reply("Cool, send app name");
-});
-
-// create conversation for getting app name, token, and optional description
-const c = new Conversation<MyContext>("setup");
-
-// c.onEnter()
-
-c.command("cancel", async (ctx) => {
-    await ctx.reply("Hit /setup again to retry");
-    ctx.conversation.leave();
-});
-c.hears(/[a-zA-Z-]+/, async (ctx) => {
-    await ctx.reply("gotcha, and token?", {
-        reply_markup: new InlineKeyboard().text("Edit", "edit"),
-    });
-    ctx.session.app = String(ctx.match);
-    ctx.conversation.forward();
-});
-c.use((ctx) => ctx.reply("u wot m8"));
-
-// c.onLeave()
-
-c.wait();
-
-c.command("cancel", async (ctx) => {
-    ctx.session.app = undefined;
-    await ctx.reply("Alright, taking you outta here");
-    ctx.conversation.leave();
-});
-c.callbackQuery("edit", async (ctx) => {
-    await ctx.reply("Sure, what is the new app?");
-    ctx.conversation.back();
-});
-
-const tokenHandler = c.hears(/^[0-9]:[a-zA-Z-_]+$/);
-tokenHandler.filter((ctx) => validateToken(ctx.match), async (ctx) => {
-    ctx.session.token = String(ctx.match);
-    await ctx.reply("Works! Description?", {
-        reply_markup: new InlineKeyboard().text("Skip", "skip"),
-    });
-    ctx.conversation.forward();
-});
-tokenHandler.use((ctx) => ctx.reply("Token invalid!"));
-c.use((ctx) => ctx.reply("Not a token!"));
-
-c.wait();
-
-c.callbackQuery("skip", async (ctx) => {
-    ctx.conversation.leave();
-    await ctx.reply("Skipped, you are done!");
-});
-c.on(":text", async (ctx) => {
-    ctx.session.desc = ctx.msg.text;
-    await ctx.reply("Everything set up!");
-    ctx.conversation.leave();
-});
-
-bot.use(c);
-bot.start();
-
-// +++ EXAMPLE 2 (LLR walk) +++
-
-const bot2 = new Bot<MyContext>("");
-bot2.use(session());
-
-bot2.command("start", async (ctx) => {
-    await ctx.reply("Choose thrice.", {
-        reply_markup: new Keyboard().text("l").text("r"),
-    });
-    ctx.conversation.enter("llr-walk");
-});
-
-const cllr = new Conversation<MyContext>("llr-walk");
-
-// root
-const l = cllr.hears("l", (ctx) => ctx.reply("1st choice is L"))
-    .diveIn();
-const r = cllr.hears("r", (ctx) => ctx.reply("1st choice is R"))
-    .diveIn();
-cllr.on("message", (ctx) => ctx.reply("Send L or R as 1st choice!"));
-
-// // L
-const ll = l.hears("l", (ctx) => ctx.reply("2nd choice after L is L"))
-    .diveIn();
-const lr = l.hears("r", (ctx) => ctx.reply("2nd choice after L is R"))
-    .diveIn();
-l.on("message", (ctx) => ctx.reply("Send L or R as 2nd choice after L!"));
-
-// R
-const rl = r.hears("l", (ctx) => ctx.reply("2nd choice after R is L"))
-    .diveIn();
-const rr = r.hears("r", (ctx) => ctx.reply("2nd choice after R is R"))
-    .diveIn();
-r.on("message", (ctx) => ctx.reply("Send L or R as 2nd choice after R!"));
-
-// LL
-const lll = ll.hears("l", (ctx) => ctx.reply("3rd choice after LL is L"))
-    .diveIn();
-const llr = ll.hears("r", (ctx) => ctx.reply("3rd choice after LL is R"))
-    .diveIn();
-ll.on("message", (ctx) => ctx.reply("Send L or R as 3rd choice after LL!"));
-
-// LR
-const lrl = lr.hears("l", (ctx) => ctx.reply("3rd choice after LR is L"))
-    .diveIn();
-const lrr = lr.hears("r", (ctx) => ctx.reply("3rd choice after LR is R"))
-    .diveIn();
-lr.on("message", (ctx) => ctx.reply("Send L or R as 3rd choice after LR!"));
-
-// RL
-const rll = rl.hears("l", (ctx) => ctx.reply("3rd choice after RL is L"))
-    .diveIn();
-const rlr = rl.hears("r", (ctx) => ctx.reply("3rd choice after RL is R"))
-    .diveIn();
-rl.on("message", (ctx) => ctx.reply("Send L or R as 3rd choice after LL!"));
-
-// RR
-const rrl = rr.hears("l", (ctx) => ctx.reply("3rd choice after RR is L"))
-    .diveIn();
-const rrr = rr.hears("r", (ctx) => ctx.reply("3rd choice after RR is R"))
-    .diveIn();
-rr.on("message", (ctx) => ctx.reply("Send L or R as 3rd choice after LR!"));
-
-// Exit on next message
-for (const c of [lll, llr, lrl, lrr, rll, rlr, rrl, rrr]) {
-    c.on("message", (ctx, next) => {
-        ctx.conversation.diveOut(3); // same as ctx.conversation.switch('llr-walk')
-        return next();
-    });
-}
-lll.on("message", (ctx) => ctx.reply("You walked LLL. Restarting!"));
-llr.on("message", (ctx) => ctx.reply("You walked LLR. Restarting!"));
-lrl.on("message", (ctx) => ctx.reply("You walked LRL. Restarting!"));
-lrr.on("message", (ctx) => ctx.reply("You walked LRR. Restarting!"));
-rll.on("message", (ctx) => ctx.reply("You walked RLL. Restarting!"));
-rlr.on("message", (ctx) => ctx.reply("You walked RLR. Restarting!"));
-rrl.on("message", (ctx) => ctx.reply("You walked RRL. Restarting!"));
-rrr.on("message", (ctx) => ctx.reply("You walked RRR. Restarting!"));
-
-////////////////////////////////////////////////////
-/////              DESIGN NOTES                /////
-////////////////////////////////////////////////////
-
-// - every conversation has an optional identifier that defaults to index.size
-// - every conversation has one composer
-// - every conversation has a reference to
-//   - its parent,
-//   - its predecessor,
-//   - its successor, and
-//   - its linked list of child conversations
-// - every conversation shares a tree-global index of identifier -> conversation, i.e. the flattened out tree structure
-// - navigation is performed by traversing the tree structure
-// - update handling is performed by O(1) lookup of the right conversation, and running the composer
-// - composer-methods are creating a new conversation with identical nodes and changed composer
-// - conversation-methods are creating a new conversation with changed nodes and identical composer
-// -
