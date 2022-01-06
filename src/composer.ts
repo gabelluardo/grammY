@@ -108,7 +108,7 @@ function generateBotErrorMessage(error: unknown) {
                 msg += `: ${error}`;
                 break;
             case "string":
-                msg += `: ${String(error).substr(0, 50)}`;
+                msg += `: ${String(error).substring(0, 50)}`;
                 break;
             default:
                 msg += "!";
@@ -171,6 +171,7 @@ export async function run<C extends Context>(
  */
 export class Composer<C extends Context> implements MiddlewareObj<C> {
     private handler: MiddlewareFn<C>;
+    private lastElse: Composer<C> | undefined;
 
     /**
      * Constructs a new composer based on the provided middleware. If no
@@ -211,6 +212,7 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
     use(...middleware: Array<Middleware<C>>) {
         const composer = new Composer(...middleware);
         this.handler = concat(this.handler, flatten(composer));
+        this.lastElse = undefined;
         return composer;
     }
 
@@ -306,15 +308,14 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
         trigger: MaybeArray<string | RegExp>,
         ...middleware: Array<Middleware<HearsContext<C>>>
     ): Composer<HearsContext<C>> {
+        const filterPredicate = matchFilter([":text", ":caption"]);
         const trg = triggerFn(trigger);
-        return this.on([":text", ":caption"]).filter(
-            (ctx): ctx is HearsContext<C> => {
-                const msg = ctx.message ?? ctx.channelPost;
-                const txt = msg.text ?? msg.caption;
-                return match(ctx, txt, trg);
-            },
-            ...middleware,
-        );
+        return this.filter((ctx): ctx is HearsContext<C> => {
+            if (!filterPredicate(ctx)) return false;
+            const msg = ctx.message ?? ctx.channelPost;
+            const txt = msg.text ?? msg.caption;
+            return match(ctx, txt, trg);
+        }, ...middleware);
     }
 
     /**
@@ -384,40 +385,38 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
             if (cmd.startsWith("/")) {
                 throw new Error(
                     `Do not include '/' when registering command handlers (use '${
-                        cmd.substr(1)
+                        cmd.substring(1)
                     }' not '${cmd}')`,
                 );
             }
             const set = cmd.indexOf("@") === -1 ? noAtCommands : atCommands;
             set.add(cmd);
         });
-        return this.on(":entities:bot_command").filter(
-            (ctx): ctx is CommandContext<C> => {
-                const msg = ctx.message ?? ctx.channelPost;
-                const txt = msg.text ?? msg.caption;
-                const entities = msg.entities ?? msg.caption_entities;
-                return entities.some((e) => {
-                    if (e.type !== "bot_command") return false;
-                    if (e.offset !== 0) return false;
-                    const cmd = txt.substring(1, e.length);
-                    if (noAtCommands.has(cmd) || atCommands.has(cmd)) {
-                        ctx.match = txt.substr(cmd.length + 1).trimStart();
-                        return true;
-                    }
-                    const index = cmd.indexOf("@");
-                    if (index === -1) return false;
-                    const atTarget = cmd.substring(index + 1);
-                    if (atTarget !== ctx.me.username) return false;
-                    const atCommand = cmd.substring(0, index);
-                    if (noAtCommands.has(atCommand)) {
-                        ctx.match = txt.substr(cmd.length + 1).trimStart();
-                        return true;
-                    }
-                    return false;
-                });
-            },
-            ...middleware,
-        );
+        const filterPredicate = matchFilter(":entities:bot_command");
+        return this.filter((ctx): ctx is CommandContext<C> => {
+            if (!filterPredicate(ctx)) return false;
+            const msg = ctx.message ?? ctx.channelPost;
+            const txt = msg.text;
+            return msg.entities.some((e) => {
+                if (e.type !== "bot_command") return false;
+                if (e.offset !== 0) return false;
+                const cmd = txt.substring(1, e.length);
+                if (noAtCommands.has(cmd) || atCommands.has(cmd)) {
+                    ctx.match = txt.substring(cmd.length + 1).trimStart();
+                    return true;
+                }
+                const index = cmd.indexOf("@");
+                if (index === -1) return false;
+                const atTarget = cmd.substring(index + 1);
+                if (atTarget !== ctx.me.username) return false;
+                const atCommand = cmd.substring(0, index);
+                if (noAtCommands.has(atCommand)) {
+                    ctx.match = txt.substring(cmd.length + 1).trimStart();
+                    return true;
+                }
+                return false;
+            });
+        }, ...middleware);
     }
 
     /**
@@ -462,11 +461,13 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
      */
     callbackQuery(
         trigger: MaybeArray<string | RegExp>,
-        ...middleware: Array<Middleware<Filter<C, "callback_query:data">>>
-    ): Composer<Filter<C, "callback_query:data">> {
+        ...middleware: Array<Middleware<CallbackQueryContext<C>>>
+    ): Composer<CallbackQueryContext<C>> {
+        const filterPredicate = matchFilter("callback_query:data");
         const trg = triggerFn(trigger);
-        return this.on("callback_query:data").filter(
-            (ctx) => match(ctx, ctx.callbackQuery.data, trg),
+        return this.filter(
+            (ctx): ctx is CallbackQueryContext<C> =>
+                filterPredicate(ctx) && match(ctx, ctx.callbackQuery.data, trg),
             ...middleware,
         );
     }
@@ -492,12 +493,15 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
     gameQuery(
         trigger: MaybeArray<string | RegExp>,
         ...middleware: Array<
-            Middleware<Filter<C, "callback_query:game_short_name">>
+            Middleware<GameQueryContext<C>>
         >
-    ): Composer<Filter<C, "callback_query:game_short_name">> {
+    ): Composer<GameQueryContext<C>> {
+        const filterPredicate = matchFilter("callback_query:game_short_name");
         const trg = triggerFn(trigger);
-        return this.on("callback_query:game_short_name").filter(
-            (ctx) => match(ctx, ctx.callbackQuery.game_short_name, trg),
+        return this.filter(
+            (ctx): ctx is GameQueryContext<C> =>
+                filterPredicate(ctx) &&
+                match(ctx, ctx.callbackQuery.game_short_name, trg),
             ...middleware,
         );
     }
@@ -526,11 +530,13 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
      */
     inlineQuery(
         trigger: MaybeArray<string | RegExp>,
-        ...middleware: Array<Middleware<Filter<C, "inline_query">>>
-    ): Composer<Filter<C, "inline_query">> {
+        ...middleware: Array<Middleware<InlineQueryContext<C>>>
+    ): Composer<InlineQueryContext<C>> {
+        const filterPredicate = matchFilter("inline_query");
         const trg = triggerFn(trigger);
-        return this.on("inline_query").filter(
-            (ctx) => match(ctx, ctx.inlineQuery.query, trg),
+        return this.filter(
+            (ctx): ctx is InlineQueryContext<C> =>
+                filterPredicate(ctx) && match(ctx, ctx.inlineQuery.query, trg),
             ...middleware,
         );
     }
@@ -583,9 +589,38 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
         predicate: (ctx: C) => MaybePromise<boolean>,
         ...middleware: Array<Middleware<C>>
     ) {
-        const composer = new Composer(...middleware);
-        this.branch(predicate, composer, pass);
-        return composer;
+        const trueBranch = new Composer(...middleware);
+        const falseBranch = new Composer<C>();
+        this.branch(predicate, trueBranch, falseBranch);
+        this.lastElse = falseBranch;
+        return trueBranch;
+    }
+
+    /**
+     * > This is an advanced method of grammY.
+     *
+     * Both `filter` and the many methods that rely on `filter` (such as `on`,
+     * `hears`, or `command`) only handle certain updates. You can use `else` to
+     * handle all updates that were not handled by the previous `filter` call.
+     *
+     * ```ts
+     * // Handles all updates with even identifier
+     * bot.filter(ctx => ctx.update.update_id % 2 === 0, ctx => { ... })
+     * // Handles all updates with odd identifier
+     * bot.else(ctx => { ... })
+     * ```
+     *
+     * This is equivalent to using `branch`, but it can often lead to more readable code.
+     *
+     * @param middleware The middleware to register
+     */
+    else(...middleware: Array<Middleware<C>>) {
+        if (this.lastElse === undefined) {
+            throw new Error(
+                "Can only use `else` directly after using `filter`!",
+            );
+        }
+        return this.lastElse.use(...middleware);
     }
 
     /**
@@ -607,7 +642,7 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
     drop(
         predicate: (ctx: C) => MaybePromise<boolean>,
         ...middleware: Array<Middleware<C>>
-    ) {
+    ): Composer<C> {
         return this.filter(
             async (ctx: C) => !(await predicate(ctx)),
             ...middleware,
@@ -642,7 +677,7 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
      *
      * @param middleware The middleware to run concurrently
      */
-    fork(...middleware: Array<Middleware<C>>) {
+    fork(...middleware: Array<Middleware<C>>): Composer<C> {
         const composer = new Composer(...middleware);
         const fork = flatten(composer);
         this.use((ctx, next) => Promise.all([next(), run(fork, ctx)]));
@@ -750,10 +785,81 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
         predicate: (ctx: C) => MaybePromise<boolean>,
         trueMiddleware: MaybeArray<Middleware<C>>,
         falseMiddleware: MaybeArray<Middleware<C>>,
-    ) {
+    ): Composer<C> {
         return this.lazy(async (ctx) =>
             (await predicate(ctx)) ? trueMiddleware : falseMiddleware
         );
+    }
+
+    /**
+     * > This is an advanced method of grammY.
+     *
+     * Allows you to run some middleware before all downstream middleware,
+     * irrespective of calls to `next`.
+     *
+     * This method takes some middleware and installs it with `bot.use`.
+     * However, `next` is only called after the installed middleware is done
+     * executing. The control flow is resumed, no matter whether the installed
+     * middleware called `next` or not, and no matter when it called next. In
+     * other words, you can completely ignore `next` in the installed
+     * middleware, as it does not have any effect.
+     *
+     * If the installed middleware throws, the error will propagate up, and the
+     * downstream middleware will not be reached.
+     *
+     * You can use this method to perform actions in your middleware
+     * definitions.
+     *
+     * ```ts
+     * // Both messages will be sent:
+     * bot.do(ctx => ctx.reply("Hi!"))
+     * bot.do(ctx => ctx.reply("How are you?"))
+     * ```
+     *
+     * This method is especially useful when defining the behavior of your bot
+     * in an imperative style, i.e. in combination with `filter` and `else`
+     * calls.
+     *
+     * @param middleware The middleware to run
+     */
+    do(...middleware: Array<Middleware<C>>): Composer<C> {
+        const composer = new Composer(...middleware);
+        const exec = flatten(composer);
+        this.use(async (ctx, next) => {
+            await run(exec, ctx);
+            await next();
+        });
+        return composer;
+    }
+
+    while<D extends C>(
+        predicate: (ctx: C) => ctx is D,
+        ...middleware: Array<Middleware<D>>
+    ): Composer<D>;
+    while(
+        predicate: (ctx: C) => MaybePromise<boolean>,
+        ...middleware: Array<Middleware<C>>
+    ): Composer<C>;
+    while(
+        predicate: (ctx: C) => MaybePromise<boolean>,
+        ...middleware: Array<Middleware<C>>
+    ) {
+        const composer = new Composer(...middleware);
+        const loop = new Composer<C>();
+        loop.filter(predicate, composer, loop);
+        this.use(loop);
+        return composer;
+    }
+
+    doWhile(
+        predicate: (ctx: C) => MaybePromise<boolean>,
+        ...middleware: Array<Middleware<C>>
+    ): Composer<C> {
+        const composer = new Composer(...middleware);
+        const loop = new Composer(composer);
+        loop.filter(predicate, composer, loop);
+        this.use(loop);
+        return composer;
     }
 
     /**
@@ -800,7 +906,7 @@ export class Composer<C extends Context> implements MiddlewareObj<C> {
             next: NextFunction,
         ) => MaybePromise<unknown>,
         ...middleware: Array<Middleware<C>>
-    ) {
+    ): Composer<C> {
         const composer = new Composer<C>(...middleware);
         const bound = flatten(composer);
         this.use(async (ctx, next) => {
@@ -827,13 +933,27 @@ function triggerFn(trigger: MaybeArray<string | RegExp>) {
     );
 }
 
-type HearsContext<C extends Context> = Filter<
+type MatchContext<C extends Context, Q extends FilterQuery> = Filter<
     C & { match: string | RegExpMatchArray },
-    ":text" | ":caption"
+    Q
 >;
+
+type HearsContext<C extends Context> = MatchContext<C, ":text" | ":caption">;
 type CommandContext<C extends Context> = Filter<
     C & { match: string },
     ":entities:bot_command"
+>;
+type CallbackQueryContext<C extends Context> = MatchContext<
+    C,
+    "callback_query:data"
+>;
+type GameQueryContext<C extends Context> = MatchContext<
+    C,
+    "callback_query:game_short_name"
+>;
+type InlineQueryContext<C extends Context> = MatchContext<
+    C,
+    "inline_query"
 >;
 
 function match<C extends Context>(
