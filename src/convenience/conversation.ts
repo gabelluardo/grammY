@@ -73,7 +73,7 @@ function trackpc<C extends ConversationContext>(
             debug("replay target reached");
             if (replayPos.frame === topFramePos) {
                 debug("done with replay, execute!");
-                debug("performing wait call again", handler.toString());
+                debug("skipping wait call", handler.toString());
                 // Replay done, skip one more handler and resume execution normally
                 delete ctx[replay];
                 ctx[active] = true;
@@ -94,10 +94,7 @@ function trackpc<C extends ConversationContext>(
 
 class ShallowConversation<B extends ConversationContext, C extends B = B>
     implements MiddlewareObj<C> {
-    protected readonly composer: Composer<C>;
-    constructor(...middleware: Array<Middleware<C>>) {
-        this.composer = new Composer(...middleware.map(trackpc));
-    }
+    constructor(protected readonly composer = new Composer<C>()) {}
 
     wait(): ShallowConversation<B> {
         const terminate = this.use(() => {
@@ -113,49 +110,44 @@ class ShallowConversation<B extends ConversationContext, C extends B = B>
         middleware: Array<Middleware<D>>,
         op: (
             composer: Composer<C>,
-            middleware: Middleware<D>,
+            middleware: Array<Middleware<D>>,
         ) => Composer<D>,
     ): ShallowConversation<C, D> {
-        const conversation = new ShallowConversation(...middleware);
-        op(this.composer, trackpc(conversation));
-        return conversation;
+        const composer = op(this.composer, middleware.map(trackpc));
+        return new ShallowConversation(composer);
     }
 
     use(...middleware: Array<Middleware<C>>): ShallowConversation<C> {
-        return this.register(middleware, (c, m) => c.use(m));
+        return this.register(middleware, (c, m) => c.use(...m));
     }
 
     do(...middleware: Array<Middleware<C>>): ShallowConversation<C> {
-        return this.register(middleware, (c, m) => c.do(m));
+        return this.register(middleware, (c, m) => c.do(...m));
     }
 
     filter(
         pred: (ctx: C) => boolean,
         ...middleware: Array<Middleware<C>>
     ): ShallowConversation<C> {
-        return this.register(middleware, (c, m) =>
-            c.filter((ctx) => {
-                debug("eval filter");
-                return pred(ctx);
-            }, m));
+        return this.register(middleware, (c, m) => c.filter(pred, ...m));
     }
 
     else(...middleware: Array<Middleware<C>>): ShallowConversation<C> {
-        return this.register(middleware, (c, m) => c.else(m));
+        return this.register(middleware, (c, m) => c.else(...m));
     }
 
     on<Q extends FilterQuery>(
         filter: Q | Q[],
         ...middleware: Array<Middleware<Filter<C, Q>>>
     ): ShallowConversation<B, Filter<C, Q>> {
-        return this.register(middleware, (c, m) => c.on(filter, m));
+        return this.register(middleware, (c, m) => c.on(filter, ...m));
     }
 
     hears(
         trigger: string | RegExp,
         ...middleware: Array<Middleware<HearsContext<C>>>
     ): ShallowConversation<B, HearsContext<C>> {
-        return this.register(middleware, (c, m) => c.hears(trigger, m));
+        return this.register(middleware, (c, m) => c.hears(trigger, ...m));
     }
 
     middleware(): MiddlewareFn<C> {
