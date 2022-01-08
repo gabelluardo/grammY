@@ -1,6 +1,7 @@
 import { Context } from "../context.ts";
 import {
     Composer,
+    HearsContext,
     Middleware,
     MiddlewareFn,
     MiddlewareObj,
@@ -33,7 +34,7 @@ interface ConversationControls {
 export interface ConversationFlavor
     extends SessionFlavor<ConversationSessionData> {
     conversation: ConversationControls;
-    [replay]?: { frame: number };
+    [replay]?: { frame: number; pc: number };
     [active]?: true;
 }
 
@@ -43,30 +44,36 @@ function getStackData<C extends ConversationContext>(ctx: C) {
     const conversation = ctx.session.conversation;
     if (conversation === undefined) throw new Error("No data available!");
     const stack = conversation.stack;
-    const lastFramePos = stack.length - 1;
-    const lastFrame = stack[lastFramePos];
-    return { stack, lastFramePos, lastFrame };
+    const stackSize = stack.length;
+    const topFramePos = stackSize - 1;
+    const topFrame = stack[topFramePos];
+    return { stack, stackSize, topFramePos, topFrame };
 }
 
 function trackpc<C extends ConversationContext>(
     mw: Middleware<C>,
-    pc: number,
 ): MiddlewareFn<C> {
     const handler = new Composer(mw).middleware();
     return async (ctx, next) => {
-        const { stack, lastFrame, lastFramePos } = getStackData(ctx);
+        const { stack, topFrame, topFramePos } = getStackData(ctx);
 
         const replayPos = ctx[replay];
         if (replayPos !== undefined) {
             // Perform replay operation
             const replayFrame = stack[replayPos.frame];
             const targetPc = replayFrame.pc;
-            if (pc < targetPc) {
+            debug("in replay:", replayPos, stack, handler.toString());
+            if (replayPos.pc < targetPc) {
+                debug("replay target", targetPc, "skipping at", replayPos.pc);
                 // Target pc not reached, skip calling handler
+                replayPos.pc++;
                 await next();
                 return;
             }
-            if (replayPos.frame === lastFramePos) {
+            debug("replay target reached");
+            if (replayPos.frame === topFramePos) {
+                debug("done with replay, execute!");
+                debug("performing wait call again", handler.toString());
                 // Replay done, skip one more handler and resume execution normally
                 delete ctx[replay];
                 ctx[active] = true;
@@ -76,10 +83,11 @@ function trackpc<C extends ConversationContext>(
             // Target reached in current frame, call handler to replay next frame
         } else {
             // Normal execution, keep track of program counter and call handler
-            debug("setpc", stack);
-            lastFrame.pc = pc;
+            topFrame.pc++;
+            debug("incpc", stack);
         }
 
+        debug("running handler");
         await handler(ctx, next);
     };
 }
@@ -87,10 +95,8 @@ function trackpc<C extends ConversationContext>(
 class ShallowConversation<B extends ConversationContext, C extends B = B>
     implements MiddlewareObj<C> {
     protected readonly composer: Composer<C>;
-    private handlerCount: number;
     constructor(...middleware: Array<Middleware<C>>) {
         this.composer = new Composer(...middleware.map(trackpc));
-        this.handlerCount = middleware.length;
     }
 
     wait(): ShallowConversation<B> {
@@ -111,7 +117,7 @@ class ShallowConversation<B extends ConversationContext, C extends B = B>
         ) => Composer<D>,
     ): ShallowConversation<C, D> {
         const conversation = new ShallowConversation(...middleware);
-        op(this.composer, trackpc(conversation, this.handlerCount++));
+        op(this.composer, trackpc(conversation));
         return conversation;
     }
 
@@ -134,6 +140,10 @@ class ShallowConversation<B extends ConversationContext, C extends B = B>
             }, m));
     }
 
+    else(...middleware: Array<Middleware<C>>): ShallowConversation<C> {
+        return this.register(middleware, (c, m) => c.else(m));
+    }
+
     on<Q extends FilterQuery>(
         filter: Q | Q[],
         ...middleware: Array<Middleware<Filter<C, Q>>>
@@ -141,22 +151,34 @@ class ShallowConversation<B extends ConversationContext, C extends B = B>
         return this.register(middleware, (c, m) => c.on(filter, m));
     }
 
+    hears(
+        trigger: string | RegExp,
+        ...middleware: Array<Middleware<HearsContext<C>>>
+    ): ShallowConversation<B, HearsContext<C>> {
+        return this.register(middleware, (c, m) => c.hears(trigger, m));
+    }
+
     middleware(): MiddlewareFn<C> {
         return async (ctx, next) => {
+            debug("enter shallow conversation");
             const { stack } = getStackData(ctx);
 
             const replayPos = ctx[replay];
             if (replayPos !== undefined) {
                 // Replaying, perform virtual stack push
                 replayPos.frame++;
+                debug("inc replay frame to", replayPos);
+                debug(stack);
             } else {
                 // Normal execution, keep track of stack
-                stack.push({ pc: 0 });
+                stack.push({ pc: -1 });
                 debug("stack push", stack);
             }
 
             await this.composer.middleware()(ctx, async () => {
+                // Normal execution, keep track of stack
                 debug("stack pop", stack);
+                debug("leave shallow conversation");
                 stack.pop();
                 await next();
             });
@@ -177,11 +199,11 @@ export class Conversation<C extends ConversationContext>
             const session = ctx.session;
 
             function enter() {
-                debug("enter");
+                debug("enter", id);
                 ctx[active] = true;
             }
             function leave() {
-                debug("leave");
+                debug("leave", id);
                 delete ctx[active];
                 delete session.conversation;
             }
@@ -199,6 +221,7 @@ export class Conversation<C extends ConversationContext>
                             `Conversation '${session.conversation.id}' is already running, cannot start '${id}'`,
                         );
                     }
+                    debug("manual enter", id);
                     session.conversation = { id, stack: [] };
                     enter();
                     await handler(ctx, () => {
@@ -209,20 +232,24 @@ export class Conversation<C extends ConversationContext>
             };
 
             // If we are not active, pass through
-            if (session.conversation === undefined) {
-                debug("not active, skipping");
+            if (session.conversation?.id !== id) {
+                debug(id, "not active, skipping");
                 await next();
                 return;
             }
 
-            debug("active!");
+            debug(id, "active!");
             const root = ctx[active] === undefined;
             if (root) {
-                ctx[replay] = { frame: 0 };
+                debug("starting replay");
+                ctx[replay] = { frame: -1, pc: 0 };
+            } else {
+                debug("calling");
             }
 
             // Should handle conversation, begin replay
             await handler(ctx, async () => {
+                debug("done");
                 if (root) leave();
                 await next();
             });
